@@ -40,7 +40,10 @@ npm install stellar-agentkit
 or
 
 bun add stellar-agentkit
-🚀 Quick Start
+```
+
+## Quick Start
+```
 import { AgentClient } from "stellar-agentkit";
 
 const agent = new AgentClient({
@@ -52,9 +55,10 @@ await agent.swap({
   to: "XLM",
   amount: "100",
 });
-🌐 Supported Networks
-Testnet (full support)
+```
 
+## Supported Networks
+Testnet (full support)
 Mainnet (transactions & bridges)
 
 📚 Documentation
