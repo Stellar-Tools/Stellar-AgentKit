@@ -59,7 +59,7 @@ await agent.swap({
 
 ## Supported Networks
 Testnet (full support)
-Mainnet (transactions & bridges)
+Mainnet (transactions)
 
 📚 Documentation
 See the /docs directory:
