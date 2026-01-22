@@ -36,10 +36,10 @@ This repository contains the **core SDK**, including utilities such as `stellarT
 ## 📦 Installation
 
 ```bash
-npm install stellar-agentkit
+npm i stellartools
 or
 
-bun add stellar-agentkit
+bun add stellartools
 ```
 
 ## Quick Start
