@@ -1,2 +1,13 @@
-# stellarTools
-Langchain dynamic structured tools for agent use on stellar chain
+# STELLAR TOOLS 🌟
+
+Open-source developer tools for Stellar & Soroban.
+
+## ✨ Features
+- HTLC helpers
+- Contract event decoding
+- Asset & contract ID utilities
+- Soroban-friendly SDK helpers
+
+## 📦 Installation
+```bash
+npm install stellartools
