@@ -34,16 +34,20 @@ This repository contains the **core SDK**, including utilities such as `stellarT
 ---
 
 ## 📦 Installation
-
 ```bash
 npm i stellartools
+```
 or
-
+```bash
 bun add stellartools
 ```
 
+---
+
 ## Quick Start
-```
+
+### Testnet (Safe for Testing)
+```typescript
 import { AgentClient } from "stellar-agentkit";
 
 const agent = new AgentClient({
@@ -57,7 +61,36 @@ await agent.swap({
 });
 ```
 
-## Supported Networks
-Testnet (full support)
-Mainnet (transactions)
+### Mainnet (Real Funds - Requires Explicit Opt-in)
 
+⚠️ **Safety Notice:** Mainnet operations require the `allowMainnet: true` flag to prevent accidental execution with real funds.
+```typescript
+import { AgentClient } from "stellar-agentkit";
+
+const agent = new AgentClient({
+  network: "mainnet",
+  allowMainnet: true, // ⚠️ Required for mainnet
+});
+
+await agent.swap({
+  from: "USDC",
+  to: "XLM",
+  amount: "100",
+});
+```
+
+**Without the `allowMainnet` flag, you'll receive an error:**
+```
+🚫 Mainnet execution blocked for safety.
+Stellar AgentKit requires explicit opt-in for mainnet operations to prevent accidental use of real funds.
+To enable mainnet, set allowMainnet: true in your config.
+```
+
+---
+
+## Supported Networks
+
+- **Testnet** (full support) - No restrictions
+- **Mainnet** (requires `allowMainnet: true`) - Real transactions
+
+---

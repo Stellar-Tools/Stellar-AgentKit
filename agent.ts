@@ -11,6 +11,7 @@ export interface AgentConfig {
   network: "testnet" | "mainnet";
   rpcUrl?: string;
   publicKey?: string;
+  allowMainnet?: boolean; // 🆕 NEW: Add optional mainnet opt-in flag
 }
 
 export class AgentClient {
@@ -18,6 +19,25 @@ export class AgentClient {
   private publicKey: string;
 
   constructor(config: AgentConfig) {
+    // 🆕 NEW: Mainnet safety check - MUST come first
+    if (config.network === "mainnet" && !config.allowMainnet) {
+      throw new Error(
+        "🚫 Mainnet execution blocked for safety.\n" +
+        "Stellar AgentKit requires explicit opt-in for mainnet operations to prevent accidental use of real funds.\n" +
+        "To enable mainnet, set allowMainnet: true in your config:\n" +
+        "  new AgentClient({ network: 'mainnet', allowMainnet: true, ... })"
+      );
+    }
+
+    // 🆕 NEW: Warning for mainnet usage (even when opted in)
+    if (config.network === "mainnet" && config.allowMainnet) {
+      console.warn(
+        "\n⚠️  WARNING: STELLAR MAINNET ACTIVE ⚠️\n" +
+        "You are executing transactions on Stellar mainnet.\n" +
+        "Real funds will be used. Double-check all parameters before proceeding.\n"
+      );
+    }
+
     this.network = config.network;
     this.publicKey = config.publicKey || process.env.STELLAR_PUBLIC_KEY || "";
     
