@@ -131,11 +131,16 @@ export const bridgeTokenTool = new DynamicStructuredTool({
         sentRestoreXdrTx.hash
       );
 
-      if (confirmRestoreXdrTx.status === rpc.Api.GetTransactionStatus.FAILED) {
-        throw new Error(
-          `Restore transaction failed. Hash: ${sentRestoreXdrTx.hash}`
-        );
-      }
+      if (
+  confirmRestoreXdrTx.status === rpc.Api.GetTransactionStatus.NOT_FOUND
+) {
+  return {
+    status: "pending_restore",
+    hash: sentRestoreXdrTx.hash,
+    network: fromNetwork,
+  };
+}
+
 
       const xdrTx2 = (await sdk.bridge.rawTxBuilder.send(
         sendParams
@@ -152,9 +157,18 @@ export const bridgeTokenTool = new DynamicStructuredTool({
     const sent = await sdk.utils.srb.sendTransactionSoroban(signedTx);
     const confirm = await sdk.utils.srb.confirmTx(sent.hash);
 
-    if (confirm.status === rpc.Api.GetTransactionStatus.FAILED) {
+    if (confirm.status === rpc.Api.GetTransactionStatus.NOT_FOUND) {
+    return {
+      status: "pending",
+      hash: sent.hash,
+      network: fromNetwork,
+    };
+  }
+
+  if (confirm.status === rpc.Api.GetTransactionStatus.FAILED) {
       throw new Error(`Transaction failed. Hash: ${sent.hash}`);
-    }
+  }
+
 
     /* Existing trustline logic */
     const destinationTokenSBR = sourceToken;

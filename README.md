@@ -146,7 +146,7 @@ await agent.bridge({
 ## 🧪 Testing
 ```bash
 # Run test suite
-npm test
+node test/bridge-tests.mjs
 
 # View test results
 # ✅ 20/20 tests passed
