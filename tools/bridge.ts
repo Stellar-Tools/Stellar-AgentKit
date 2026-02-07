@@ -25,7 +25,6 @@ dotenv.config({ path: ".env" });
 const fromAddress = process.env.STELLAR_PUBLIC_KEY as string;
 const privateKey = process.env.STELLAR_PRIVATE_KEY as string;
 
-/* NEW: Network config */
 type StellarNetwork = "stellar-testnet" | "stellar-mainnet";
 
 const STELLAR_NETWORK_CONFIG: Record<
@@ -45,7 +44,6 @@ export const bridgeTokenTool = new DynamicStructuredTool({
   description:
     "Bridge token from Stellar chain to EVM compatible chains. Requires amount and toAddress as string",
 
-  /* UPDATED schema */
   schema: z.object({
     amount: z.string().describe("The amount of tokens to bridge"),
     toAddress: z.string().describe("The destination address"),
@@ -55,8 +53,15 @@ export const bridgeTokenTool = new DynamicStructuredTool({
       .describe("Source Stellar network"),
   }),
 
-  func: async ({ amount, toAddress, fromNetwork }: { amount: string; toAddress: string; fromNetwork: StellarNetwork }) => {
-    /*  NEW: Mainnet safeguard */
+  func: async ({
+    amount,
+    toAddress,
+    fromNetwork,
+  }: {
+    amount: string;
+    toAddress: string;
+    fromNetwork: StellarNetwork;
+  }) => {
     if (
       fromNetwork === "stellar-mainnet" &&
       process.env.ALLOW_MAINNET_BRIDGE !== "true"
@@ -131,16 +136,24 @@ export const bridgeTokenTool = new DynamicStructuredTool({
         sentRestoreXdrTx.hash
       );
 
+      // ✅ FIX: handle FAILED restore explicitly
       if (
-  confirmRestoreXdrTx.status === rpc.Api.GetTransactionStatus.NOT_FOUND
-) {
-  return {
-    status: "pending_restore",
-    hash: sentRestoreXdrTx.hash,
-    network: fromNetwork,
-  };
-}
+        confirmRestoreXdrTx.status === rpc.Api.GetTransactionStatus.FAILED
+      ) {
+        throw new Error(
+          `Restore transaction failed. Hash: ${sentRestoreXdrTx.hash}`
+        );
+      }
 
+      if (
+        confirmRestoreXdrTx.status === rpc.Api.GetTransactionStatus.NOT_FOUND
+      ) {
+        return {
+          status: "pending_restore",
+          hash: sentRestoreXdrTx.hash,
+          network: fromNetwork,
+        };
+      }
 
       const xdrTx2 = (await sdk.bridge.rawTxBuilder.send(
         sendParams
@@ -158,19 +171,17 @@ export const bridgeTokenTool = new DynamicStructuredTool({
     const confirm = await sdk.utils.srb.confirmTx(sent.hash);
 
     if (confirm.status === rpc.Api.GetTransactionStatus.NOT_FOUND) {
-    return {
-      status: "pending",
-      hash: sent.hash,
-      network: fromNetwork,
-    };
-  }
+      return {
+        status: "pending",
+        hash: sent.hash,
+        network: fromNetwork,
+      };
+    }
 
-  if (confirm.status === rpc.Api.GetTransactionStatus.FAILED) {
+    if (confirm.status === rpc.Api.GetTransactionStatus.FAILED) {
       throw new Error(`Transaction failed. Hash: ${sent.hash}`);
-  }
+    }
 
-
-    /* Existing trustline logic */
     const destinationTokenSBR = sourceToken;
 
     const balanceLine = await sdk.utils.srb.getBalanceLine(
@@ -209,7 +220,6 @@ export const bridgeTokenTool = new DynamicStructuredTool({
       };
     }
 
-    /* NORMALIZED response */
     return {
       status: "confirmed",
       hash: sent.hash,
