@@ -51,12 +51,18 @@ export class AgentClient {
    * @param params Bridge parameters
    */
   async bridge(params: {
-    amount: string;
-    toAddress: string;
-  }) {
-    // Calling the internal tool function
-    return await bridgeTokenTool.func(params);
-  }
+  amount: string;
+  toAddress: string;
+}) {
+  return await bridgeTokenTool.func({
+    ...params,
+    fromNetwork:
+      this.network === "mainnet"
+        ? "stellar-mainnet"
+        : "stellar-testnet",
+  });
+}
+
 
   /**
    * Liquidity Pool operations.
