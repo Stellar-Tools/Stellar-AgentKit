@@ -65,31 +65,7 @@ await agent.swap({
 });
 ```
 
-### Mainnet (Real Funds - Requires Explicit Opt-in)
-
-⚠️ **Safety Notice:** Mainnet operations require the `allowMainnet: true` flag to prevent accidental execution with real funds.
-
-```typescript
-import { AgentClient } from "stellar-agentkit";
-
-const agent = new AgentClient({
-  network: "mainnet",
-  allowMainnet: true, // ⚠️ Required for mainnet
-});
-
-await agent.swap({
-  from: "USDC",
-  to: "XLM",
-  amount: "100",
-});
-```
-
-**Without the `allowMainnet` flag, you'll receive an error:**
-```
-🚫 Mainnet execution blocked for safety.
-Stellar AgentKit requires explicit opt-in for mainnet operations to prevent accidental use of real funds.
-To enable mainnet, set allowMainnet: true in your config.
-```
+⚠️ **For mainnet operations:** See the [Swap Tokens](#-swap-tokens) and [Bridge Tokens](#-bridge-tokens) sections below for mainnet configuration and safety requirements.
 
 ---
 
