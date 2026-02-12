@@ -34,7 +34,6 @@ This repository contains the **core SDK**, including utilities such as `stellarT
 ---
 
 ## 📦 Installation
-
 ```bash
 npm i stellartools
 ```
