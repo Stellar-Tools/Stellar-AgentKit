@@ -114,13 +114,11 @@ export function buildTransactionFromXDR(
   // Note: Fee and timeout are already set in the XDR by external SDKs
   // We only apply memo if provided and not already in the transaction
   if (config.memo) {
-    // Memos are typically already set by the SDK, but document this for future use
-    console.log(
-      `Memo provided for ${operationType} operation. Note: XDR transactions may already include memo from source SDK.`
-    );
+    (transaction as Transaction).memo = Memo.text(config.memo);
   }
 
   return transaction;
+
 }
 
 /**

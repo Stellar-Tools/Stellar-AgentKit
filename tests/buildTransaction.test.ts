@@ -22,10 +22,26 @@ function test(name: string, fn: () => void) {
 
 function expect(actual: any) {
   return {
-    toBeDefined: () => { if (actual === undefined || actual === null) throw new Error(`Expected value to be defined, got ${actual}`); },
-    toBe: (expected: any) => { if (actual !== expected) throw new Error(`Expected ${expected}, got ${actual}`); },
-    toBeGreaterThan: (n: number) => { if (actual <= n) throw new Error(`Expected ${actual} > ${n}`); },
-    toBeLessThanOrEqual: (n: number) => { if (actual > n) throw new Error(`Expected ${actual} <= ${n}`); },
+    toBeDefined: () => { 
+      if (actual === undefined || actual === null) 
+        throw new Error(`Expected value to be defined, got ${actual}`); 
+    },
+    toBe: (expected: any) => { 
+      if (actual !== expected) 
+        throw new Error(`Expected ${expected}, got ${actual}`); 
+    },
+    toBeGreaterThan: (n: number) => {
+      if (actual === undefined || actual === null || isNaN(Number(actual)))
+        throw new Error(`Expected a valid number but got ${actual}`);
+      if (Number(actual) <= n) 
+        throw new Error(`Expected ${actual} > ${n}`); 
+    },
+    toBeLessThanOrEqual: (n: number) => { 
+      if (actual === undefined || actual === null || isNaN(Number(actual)))
+        throw new Error(`Expected a valid number but got ${actual}`);
+      if (Number(actual) > n) 
+        throw new Error(`Expected ${actual} <= ${n}`); 
+    },
   };
 }
 
