@@ -16,6 +16,7 @@ import {
   Networks
 } from "@stellar/stellar-sdk";
 import { ensure } from "../utils/utils";
+import { buildTransactionFromXDR } from "../utils/buildTransaction";
 import * as dotenv from "dotenv";
 import { DynamicStructuredTool } from "@langchain/core/tools";
 import {z} from "zod";
@@ -53,9 +54,9 @@ func: async ({amount,toAddress}) => {
   };
   const xdrTx: string = (await sdk.bridge.rawTxBuilder.send(sendParams)) as string;
 
-  // SendTx
+  // SendTx - Use unified transaction builder for XDR-based bridge operations
   const srbKeypair = Keypair.fromSecret(privateKey);
-  const transaction = TransactionBuilder.fromXDR(xdrTx, Networks.TESTNET);
+  const transaction = buildTransactionFromXDR("bridge", xdrTx, Networks.TESTNET);
   transaction.sign(srbKeypair);
   let signedTx = transaction.toXDR();
 
@@ -79,7 +80,7 @@ func: async ({amount,toAddress}) => {
     }
     //get new tx with updated sequences
     const xdrTx2 = (await sdk.bridge.rawTxBuilder.send(sendParams)) as string;
-    const transaction2 = TransactionBuilder.fromXDR(xdrTx2, Networks.TESTNET);
+    const transaction2 = buildTransactionFromXDR("bridge", xdrTx2, Networks.TESTNET);
     transaction2.sign(srbKeypair);
     signedTx = transaction2.toXDR();
   }
@@ -111,9 +112,9 @@ func: async ({amount,toAddress}) => {
       // limit: "1000000",
     });
 
-    //SignTx
+    //SignTx - Use unified transaction builder for XDR-based bridge TrustLine operation
     const keypair = StellarKeypair.fromSecret(privateKey);
-    const transaction = StellarTransactionBuilder.fromXDR(xdrTx, Networks.TESTNET);
+    const transaction = buildTransactionFromXDR("bridge", xdrTx, Networks.TESTNET);
     transaction.sign(keypair);
     const signedTrustLineTx = transaction.toXDR();
 

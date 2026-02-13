@@ -10,6 +10,7 @@ import {
     Address,
   } from "@stellar/stellar-sdk";
   import { signTransaction } from "./stellar";
+  import { buildTransaction } from "../utils/buildTransaction";
   
   // Configuration
   const rpcUrl = "https://soroban-testnet.stellar.org";
@@ -42,30 +43,14 @@ import {
       });
   
       const contract = new Contract(contractAddress);
-      const params = {
-        fee: BASE_FEE,
-        networkPassphrase,
-      };
   
-      // Build transaction
-      const builder = new TransactionBuilder(sourceAccount, params);
-      let transaction;
-      if (values == null) {
-        transaction = builder
-          .addOperation(contract.call(functName))
-          .setTimeout(300)
-          .build();
-      } else if (Array.isArray(values)) {
-        transaction = builder
-          .addOperation(contract.call(functName, ...values))
-          .setTimeout(300)
-          .build();
-      } else {
-        transaction = builder
-          .addOperation(contract.call(functName, values))
-          .setTimeout(300)
-          .build();
-      }
+      // Build transaction using unified builder
+      const sorobanOperation = {
+        contract,
+        functionName: functName,
+        args: values == null ? undefined : Array.isArray(values) ? values : [values],
+      };
+      const transaction = buildTransaction("lp", sourceAccount, sorobanOperation);
   
       const simulation = await server.simulateTransaction(transaction).catch((err) => {
         console.error(`Simulation failed for ${functName}: ${err.message}`);

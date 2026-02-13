@@ -4,10 +4,10 @@ import {
     TransactionBuilder,
     nativeToScVal,
     Networks,
-    BASE_FEE,
     Address,
   } from "@stellar/stellar-sdk";
   import {signTransaction} from "./stellar";
+  import { buildTransaction } from "../utils/buildTransaction";
   
   // Configuration
   const rpcUrl = "https://soroban-testnet.stellar.org";
@@ -35,30 +35,14 @@ import {
       });
   
       const contract = new Contract(contractAddress);
-      const params = {
-        fee: BASE_FEE,
-        networkPassphrase,
-      };
   
-      // Build transaction
-      let transaction;
-      const builder = new TransactionBuilder(sourceAccount, params);
-      if (values == null) {
-        transaction = builder
-          .addOperation(contract.call(functName))
-          .setTimeout(30)
-          .build();
-      } else if (Array.isArray(values)) {
-        transaction = builder
-          .addOperation(contract.call(functName, ...values))
-          .setTimeout(30)
-          .build();
-      } else {
-        transaction = builder
-          .addOperation(contract.call(functName, values))
-          .setTimeout(30)
-          .build();
-      }
+      // Build transaction using unified builder
+      const sorobanOperation = {
+        contract,
+        functionName: functName,
+        args: values == null ? undefined : Array.isArray(values) ? values : [values],
+      };
+      const transaction = buildTransaction("stake", sourceAccount, sorobanOperation);
   
       // Prepare and sign transaction
       const preparedTx = await server.prepareTransaction(transaction).catch((err) => {
