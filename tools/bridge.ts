@@ -16,6 +16,7 @@ import {
   Networks
 } from "@stellar/stellar-sdk";
 import { ensure } from "../utils/utils";
+import { buildTransactionFromXDR } from "../utils/buildTransaction";
 import * as dotenv from "dotenv";
 import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
@@ -62,12 +63,13 @@ export const bridgeTokenTool = new DynamicStructuredTool({
     toAddress: string;
     fromNetwork: StellarNetwork;
   }) => {
+    // Mainnet safeguard - additional layer beyond AgentClient
     if (
       fromNetwork === "stellar-mainnet" &&
       process.env.ALLOW_MAINNET_BRIDGE !== "true"
     ) {
       throw new Error(
-        "Mainnet bridging is disabled. Set ALLOW_MAINNET_BRIDGE=true to enable."
+        "Mainnet bridging is disabled. Set ALLOW_MAINNET_BRIDGE=true in your .env file to enable."
       );
     }
 
@@ -105,9 +107,10 @@ export const bridgeTokenTool = new DynamicStructuredTool({
       sendParams
     )) as string;
 
+    // Use unified transaction builder for XDR-based bridge operations
     const srbKeypair = Keypair.fromSecret(privateKey);
-
-    const transaction = TransactionBuilder.fromXDR(
+    const transaction = buildTransactionFromXDR(
+      "bridge",
       xdrTx,
       STELLAR_NETWORK_CONFIG[fromNetwork].networkPassphrase
     );
@@ -121,22 +124,22 @@ export const bridgeTokenTool = new DynamicStructuredTool({
       );
 
     if (restoreXdrTx) {
-      const restoreTx = TransactionBuilder.fromXDR(
+      const restoreTx = buildTransactionFromXDR(
+        "bridge",
         restoreXdrTx,
         STELLAR_NETWORK_CONFIG[fromNetwork].networkPassphrase
       );
       restoreTx.sign(srbKeypair);
+      const signedRestoreXdrTx = restoreTx.toXDR();
 
       const sentRestoreXdrTx =
-        await sdk.utils.srb.sendTransactionSoroban(
-          restoreTx.toXDR()
-        );
+        await sdk.utils.srb.sendTransactionSoroban(signedRestoreXdrTx);
 
       const confirmRestoreXdrTx = await sdk.utils.srb.confirmTx(
         sentRestoreXdrTx.hash
       );
 
-      // ✅ FIX: handle FAILED restore explicitly
+      // Handle FAILED restore explicitly
       if (
         confirmRestoreXdrTx.status === rpc.Api.GetTransactionStatus.FAILED
       ) {
@@ -155,11 +158,13 @@ export const bridgeTokenTool = new DynamicStructuredTool({
         };
       }
 
+      // Get new tx with updated sequences
       const xdrTx2 = (await sdk.bridge.rawTxBuilder.send(
         sendParams
       )) as string;
 
-      const transaction2 = TransactionBuilder.fromXDR(
+      const transaction2 = buildTransactionFromXDR(
+        "bridge",
         xdrTx2,
         STELLAR_NETWORK_CONFIG[fromNetwork].networkPassphrase
       );
@@ -182,6 +187,7 @@ export const bridgeTokenTool = new DynamicStructuredTool({
       throw new Error(`Transaction failed. Hash: ${sent.hash}`);
     }
 
+    // TrustLine check and setup for destinationToken if it is SRB
     const destinationTokenSBR = sourceToken;
 
     const balanceLine = await sdk.utils.srb.getBalanceLine(
@@ -202,15 +208,18 @@ export const bridgeTokenTool = new DynamicStructuredTool({
           tokenAddress: destinationTokenSBR.tokenAddress,
         });
 
+      // Use unified transaction builder for XDR-based bridge TrustLine operation
       const keypair = StellarKeypair.fromSecret(privateKey);
-      const trustTx = StellarTransactionBuilder.fromXDR(
+      const trustTx = buildTransactionFromXDR(
+        "bridge",
         xdrTx,
         STELLAR_NETWORK_CONFIG[fromNetwork].networkPassphrase
       );
       trustTx.sign(keypair);
+      const signedTrustLineTx = trustTx.toXDR();
 
       const submit = await sdk.utils.srb.submitTransactionStellar(
-        trustTx.toXDR()
+        signedTrustLineTx
       );
 
       return {
