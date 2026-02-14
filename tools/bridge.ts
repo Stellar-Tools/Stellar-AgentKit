@@ -28,7 +28,7 @@ const privateKey = process.env.STELLAR_PRIVATE_KEY as string;
 
 type StellarNetwork = "stellar-testnet" | "stellar-mainnet";
 
-const STELLAR_NETWORK_CONFIG: Record<
+const STELLAR_NETWORK_CONFIG: Record
   StellarNetwork,
   { networkPassphrase: string }
 > = {
