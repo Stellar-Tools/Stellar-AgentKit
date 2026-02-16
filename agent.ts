@@ -11,7 +11,7 @@ export interface AgentConfig {
   network: "testnet" | "mainnet";
   rpcUrl?: string;
   publicKey?: string;
-  allowMainnet?: boolean; // 🆕 NEW: Add optional mainnet opt-in flag
+  allowMainnet?: boolean; // Optional mainnet opt-in flag for general operations
 }
 
 export class AgentClient {
@@ -19,7 +19,7 @@ export class AgentClient {
   private publicKey: string;
 
   constructor(config: AgentConfig) {
-    // 🆕 NEW: Mainnet safety check - MUST come first
+    // Mainnet safety check for general operations
     if (config.network === "mainnet" && !config.allowMainnet) {
       throw new Error(
         "🚫 Mainnet execution blocked for safety.\n" +
@@ -29,7 +29,7 @@ export class AgentClient {
       );
     }
 
-    // 🆕 NEW: Warning for mainnet usage (even when opted in)
+    // Warning for mainnet usage (when opted in)
     if (config.network === "mainnet" && config.allowMainnet) {
       console.warn(
         "\n⚠️  WARNING: STELLAR MAINNET ACTIVE ⚠️\n" +
@@ -68,14 +68,27 @@ export class AgentClient {
 
   /**
    * Bridge tokens from Stellar to EVM compatible chains.
+   * 
+   * ⚠️ IMPORTANT: Mainnet bridging requires BOTH:
+   * 1. AgentClient initialized with allowMainnet: true
+   * 2. ALLOW_MAINNET_BRIDGE=true in your .env file
+   * 
+   * This dual-safeguard approach prevents accidental mainnet bridging.
+   * 
    * @param params Bridge parameters
+   * @returns Bridge transaction result with status, hash, and network
    */
   async bridge(params: {
     amount: string;
     toAddress: string;
   }) {
-    // Calling the internal tool function
-    return await bridgeTokenTool.func(params);
+    return await bridgeTokenTool.func({
+      ...params,
+      fromNetwork:
+        this.network === "mainnet"
+          ? "stellar-mainnet"
+          : "stellar-testnet",
+    });
   }
 
   /**
