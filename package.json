@@ -18,8 +18,8 @@
     "build": "tsc",
     "prepare": "npm run build",
     "postbuild": "copyfiles index.d.ts dist/",
-    "test": "vitest",
-    "test:watch": "vitest --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage"
   },
