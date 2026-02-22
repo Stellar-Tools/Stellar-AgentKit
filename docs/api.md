@@ -37,6 +37,7 @@ const agent = new AgentClient({
 
 Performs token swap on Stellar network using the configured liquidity pool.
 
+> **Note:** Swap and liquidity pool operations currently execute on the Stellar **testnet only**, using a testnet RPC URL and passphrase, regardless of the `AgentClient`’s `network` or `rpcUrl` settings. Do not treat these methods as mainnet‑ready.
 #### Parameters
 
 ```typescript
