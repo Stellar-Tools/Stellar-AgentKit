@@ -250,7 +250,7 @@ test('Should validate initial supply format', () => {
   
   let invalidCount = 0;
   invalidSupplies.forEach(supply => {
-    if (supply === '' || supply === 'invalid' || parseFloat(supply) <= 0) {
+    if (supply === '' || Number.isNaN(Number(supply)) || parseFloat(supply) <= 0) {
       invalidCount++;
     }
   });
