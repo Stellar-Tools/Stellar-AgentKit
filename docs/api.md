@@ -126,7 +126,7 @@ Adds liquidity to the pool by providing both assets.
 
 #### Returns
 
-`Promise<any>` - Transaction result
+`Promise<void>` - Resolves when the deposit transaction has been submitted
 
 #### Example
 
