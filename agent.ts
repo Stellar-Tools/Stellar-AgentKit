@@ -444,12 +444,7 @@ export class AgentClient {
         .addOperation(
           Operation.setOptions({
             // Set master weight to 0 - this makes the account immutable
-            masterWeight: 0,
-            // Remove the issuer as a signer (redundant but explicit)
-            signer: {
-              ed25519PublicKey: issuerKeypair.publicKey(),
-              weight: 0
-            }
+            masterWeight: 0
           })
         )
         .setTimeout(30)
