@@ -50,7 +50,7 @@ Performs token swap on Stellar network using the configured liquidity pool.
 
 #### Returns
 
-`Promise<any>` - Transaction result from the Stellar network
+`Promise<void>` - Resolves when the swap transaction has been submitted to the Stellar network
 
 #### Example
 
