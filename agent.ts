@@ -364,9 +364,15 @@ export class AgentClient {
           balance.asset_issuer === asset.issuer
         );
       });
-    } catch (error) {
-      console.error(`Error checking trustline: ${error}`);
-      return false;
+    } catch (error: any) {
+      // If the account does not exist, there can be no trustline.
+      const status = error?.response?.status;
+      if (status === 404) {
+        return false;
+      }
+
+      console.error(`Error checking trustline: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
     }
   }
 
