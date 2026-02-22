@@ -90,8 +90,8 @@ Promise<{
   status: string;
   hash: string;
   network: string;
-  asset: string;
-  amount: string;
+  asset?: string;  // Present for completed/settled bridge operations
+  amount?: string; // Present for completed/settled bridge operations
 }>
 ```
 
