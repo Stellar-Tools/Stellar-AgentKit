@@ -13,7 +13,6 @@ Creates a new AgentClient instance for interacting with the Stellar network.
 | `network` | `"testnet" \| "mainnet"` | ✅ | Network to connect to |
 | `allowMainnet` | `boolean` | ❌ | Required for mainnet execution (safety flag) |
 | `publicKey` | `string` | ❌ | Public key for operations (can use env var) |
-| `rpcUrl` | `string` | ❌ | Custom RPC URL endpoint |
 
 #### Example
 
