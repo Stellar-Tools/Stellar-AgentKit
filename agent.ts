@@ -119,7 +119,7 @@ Reason: ${originalMessage}`;
       });
     } catch (error) {
       const originalMessage = error instanceof Error ? error.message : String(error);
-      const maskedAddress = params.toAddress.substring(0, 6) + "..." + params.toAddress.substring(params.toAddress.length - 4);
+      const maskedAddress = params.toAddress.substring(0, 4) + "..." + params.toAddress.substring(params.toAddress.length - 4);
       
       throw new Error(`Bridge operation failed.
 Network: ${this.network}
