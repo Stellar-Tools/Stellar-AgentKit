@@ -28,6 +28,13 @@ export interface LaunchTokenParams {
   issuerSecret: string;
   distributorSecret: string;
   initialSupply: string;
+  /**
+   * Optional display/metadata decimals.
+   *
+   * NOTE: Stellar assets always have a fixed on-chain precision of 7 decimal places.
+   * This field is currently ignored by the implementation and does NOT affect the
+   * actual asset precision on the Stellar network.
+   */
   decimals?: number;
   lockIssuer?: boolean;
 }
