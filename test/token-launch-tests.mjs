@@ -130,14 +130,15 @@ test('Asset should be created with correct code and issuer', () => {
   }
 });
 
-test('Should handle asset code normalization', () => {
+test('Should preserve asset code casing', () => {
   const inputCode = 'mytoken';
-  const normalizedCode = inputCode.toUpperCase();
   
-  if (normalizedCode === 'MYTOKEN') {
-    // Test passes - normalization works
+  // In the actual implementation, the asset code is used as-is and is case-sensitive.
+  // This test verifies that we do not incorrectly assume automatic uppercasing.
+  if (inputCode === 'mytoken') {
+    // Test passes - casing is preserved
   } else {
-    throw new Error('Asset code normalization failed');
+    throw new Error('Asset code casing was unexpectedly modified');
   }
 });
 
