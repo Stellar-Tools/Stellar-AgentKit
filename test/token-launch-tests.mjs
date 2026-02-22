@@ -115,7 +115,7 @@ console.log("-".repeat(60));
 
 test('Asset should be created with correct code and issuer', () => {
   const code = 'TESTTOKEN';
-  const issuerPublicKey = 'GCKFBEIYTKP5RDHSIG2D7EMDCENTAL22AFD6AVHCH4ZXT72KI4RYSOBOMRST';
+  const issuerPublicKey = 'GABCDE1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF12';
   
   // Simulate asset creation
   const asset = {
