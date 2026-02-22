@@ -81,7 +81,7 @@ export class AgentClient {
   }, originalError: unknown): string {
     const originalMessage = originalError instanceof Error ? originalError.message : String(originalError);
     
-    // Mask sensitive parts of addresses for security
+    // Mask parts of addresses in logs for privacy/readability (addresses are public on-chain)
     const maskedRecipient = params.to.substring(0, 4) + "..." + params.to.substring(params.to.length - 4);
     
     return `Swap operation failed.
