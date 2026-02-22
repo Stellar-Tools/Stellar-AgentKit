@@ -294,7 +294,7 @@ export class AgentClient {
             amount: initialSupply
           })
         )
-        .setTimeout(30)
+        .setTimeout(300)
         .build();
 
       paymentTransaction.sign(issuerKeypair);
