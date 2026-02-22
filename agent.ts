@@ -66,7 +66,7 @@ export class AgentClient {
         params.inMax
       );
     } catch (error) {
-      throw new Error(this.formatSwapError(params, error));
+      throw new Error(this.formatSwapError(params, error), { cause: error as unknown });
     }
   }
 
