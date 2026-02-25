@@ -17,7 +17,9 @@
   "scripts": {
     "build": "tsc",
     "prepare": "npm run build",
-    "postbuild": "copyfiles index.d.ts dist/"
+    "postbuild": "copyfiles index.d.ts dist/",
+    "test": "node dist/tests/errors.test.js && node dist/tests/agentKitError.test.js && node dist/tests/buildTransaction.test.js && node dist/tests/contract-errors.test.js",
+    "docs:generate": "typedoc"
   },
   "dependencies": {
     "@allbridge/bridge-core-sdk": "^3.22.0",
@@ -31,7 +33,8 @@
   },
   "devDependencies": {
     "@types/big.js": "^6.2.2",
-    "copyfiles": "^2.4.1"
+    "copyfiles": "^2.4.1",
+    "typedoc": "^0.27.0"
   },
   "directories": {
     "lib": "lib"
