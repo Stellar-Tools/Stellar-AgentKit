@@ -109,5 +109,7 @@
     /* Completeness */
     // "skipDefaultLibCheck": true,                      /* Skip type checking .d.ts files that are included with TypeScript. */
     "skipLibCheck": true                                 /* Skip type checking all .d.ts files. */
-  }
+  },
+  "include": ["*.ts", "lib/**/*.ts", "tools/**/*.ts", "utils/**/*.ts", "tests/buildTransaction.test.ts", "tests/integration.test.ts", "tests/error-scenarios.test.ts", "tests/errors.test.ts", "tests/agentKitError.test.ts", "tests/contract-errors.test.ts", "agent.ts"],
+  "exclude": ["node_modules", "dist", "Stellar-AgentKit"]
 }

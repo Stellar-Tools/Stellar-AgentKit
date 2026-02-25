@@ -4,20 +4,19 @@ Follow-up work that can be done gradually.
 
 ---
 
-## 1. Tests
+## 1. Tests ✅
 
-- **Integration tests (testnet):** 1–2 real swap/launchToken scenarios with live RPC. Use `.env` for keys; skip in CI if env not set.
-- **Error scenario tests:** Extend coverage for invalid address, mainnet guard, etc.
+- **Integration tests (testnet):** `tests/integration.test.ts` — runs `lp.getReserves()` / `lp.getShareId()` when `STELLAR_PUBLIC_KEY` is set (skips in CI with dummy key).
+- **Error scenario tests:** `tests/error-scenarios.test.ts` — mainnet guard, invalid `to` address for swap, testnet with allowMainnet.
 
-## 2. CI / Automation
+## 2. CI / Automation ✅
 
-- **GitHub Actions:** Already added (`.github/workflows/ci.yml`). Ensure `pnpm run test` exists and test files are in `tests/`.
-- **Docs in CI:** Optional step to run `pnpm run docs:generate` and publish or commit `docs/api-reference/`.
+- **GitHub Actions:** Already added (`.github/workflows/ci.yml`). Runs build, test, and `pnpm run docs:generate`.
 
-## 3. Documentation
+## 3. Documentation ✅
 
 - **README:** Error handling and API reference sections added.
-- **Error contract:** In `docs/api.md`, add a table of which method throws which error codes.
+- **Error contract:** `docs/api.md` now includes a table of which method throws and when (constructor mainnet guard, invalid address, contract/RPC, bridge).
 
 ## 4. Optional
 

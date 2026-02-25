@@ -18,7 +18,7 @@
     "build": "tsc",
     "prepare": "npm run build",
     "postbuild": "copyfiles index.d.ts dist/",
-    "test": "node dist/tests/errors.test.js && node dist/tests/agentKitError.test.js && node dist/tests/buildTransaction.test.js && node dist/tests/contract-errors.test.js",
+    "test": "node dist/tests/errors.test.js && node dist/tests/agentKitError.test.js && node dist/tests/buildTransaction.test.js && node dist/tests/contract-errors.test.js && node dist/tests/integration.test.js && node dist/tests/error-scenarios.test.js",
     "docs:generate": "typedoc"
   },
   "dependencies": {

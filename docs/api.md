@@ -114,3 +114,19 @@ Returns the current reserves of the liquidity pool.
 Returns the share ID of the liquidity pool.
 
 **Returns:** `Promise<string>`
+
+---
+
+## Error contract
+
+The following table summarizes when methods throw and what to expect. All throwing methods use JavaScript `Error`; the message is descriptive.
+
+| Method / context | When it throws | Typical message or condition |
+|------------------|----------------|-------------------------------|
+| `new AgentClient({ network: "mainnet" })` | Mainnet without opt-in | `"Mainnet execution blocked"`, `"allowMainnet"` |
+| `swap(params)` | Invalid `params.to` (not `G...`/`C...` 56 chars) | `"Invalid address format: ..."` |
+| `lp.deposit(params)` | Invalid `params.to` | `"Invalid address format: ..."` |
+| `lp.withdraw(params)` | Invalid `params.to` | `"Invalid address format: ..."` |
+| Contract / RPC (swap, deposit, withdraw) | Simulation or send failure | `"Simulation failed"`, `"Failed to prepare transaction"`, `"Transaction failed"`, etc. |
+| `bridge(params)` | Mainnet bridge without `ALLOW_MAINNET_BRIDGE=true` | Bridge SDK or config error |
+| `bridge(params)` | RPC or bridge API failure | SDK-specific error message |

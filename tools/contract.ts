@@ -7,6 +7,7 @@ import {
   withdraw,
   getReserves,
 } from "../lib/contract";
+import { AgentKitError, AgentKitErrorCode, isAgentKitError } from "../lib/errors";
 
 // Assuming env variables are already loaded elsewhere
 const STELLAR_PUBLIC_KEY = process.env.STELLAR_PUBLIC_KEY!;
@@ -63,21 +64,30 @@ export const StellarLiquidityContractTool = new DynamicStructuredTool({
         }
         case "deposit": {
           if (!to || !desiredA || !minA || !desiredB || !minB) {
-            throw new Error("to, desiredA, minA, desiredB, and minB are required for deposit");
+            throw new AgentKitError(
+              AgentKitErrorCode.TOOL_EXECUTION_FAILED,
+              "to, desiredA, minA, desiredB, and minB are required for deposit"
+            );
           }
           const result = await deposit(STELLAR_PUBLIC_KEY, to, desiredA, minA, desiredB, minB);
           return result ??`Deposited successfully to ${to}.`;
         }
         case "swap": {
           if (!to || buyA === undefined || !out || !inMax) {
-            throw new Error("to, buyA, out, and inMax are required for swap");
+            throw new AgentKitError(
+              AgentKitErrorCode.TOOL_EXECUTION_FAILED,
+              "to, buyA, out, and inMax are required for swap"
+            );
           }
           const result=await swap(STELLAR_PUBLIC_KEY, to, buyA, out, inMax);
           return result ?? `Swapped successfully to ${to}.`;
         }
         case "withdraw": {
           if (!to || !shareAmount || !minA || !minB) {
-            throw new Error("to, shareAmount, minA, and minB are required for withdraw");
+            throw new AgentKitError(
+              AgentKitErrorCode.TOOL_EXECUTION_FAILED,
+              "to, shareAmount, minA, and minB are required for withdraw"
+            );
           }
           const result = await withdraw(STELLAR_PUBLIC_KEY, to, shareAmount, minA, minB);
           return result
@@ -91,11 +101,18 @@ export const StellarLiquidityContractTool = new DynamicStructuredTool({
             : "No reserves found.";
         }
         default:
-          throw new Error("Unsupported action");
+          throw new AgentKitError(AgentKitErrorCode.TOOL_EXECUTION_FAILED, "Unsupported action");
       }
-    } catch (error: any) {
-      console.error("StellarLiquidityContractTool error:", error.message);
-      throw new Error(`Failed to execute ${action}: ${error.message}`);
+    } catch (error: unknown) {
+      if (isAgentKitError(error)) throw error;
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error("StellarLiquidityContractTool error:", msg);
+      throw new AgentKitError(
+        AgentKitErrorCode.TOOL_EXECUTION_FAILED,
+        `Failed to execute ${action}: ${msg}`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
     }
   },
 });

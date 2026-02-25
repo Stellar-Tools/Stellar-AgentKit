@@ -11,17 +11,21 @@ import {
   } from "@stellar/stellar-sdk";
   import { signTransaction } from "./stellar";
   import { buildTransaction } from "../utils/buildTransaction";
-  
+  import { AgentKitError, AgentKitErrorCode } from "./errors";
+
   // Configuration
   const rpcUrl = "https://soroban-testnet.stellar.org";
   const contractAddress = "CCUMBJFVC3YJOW3OOR6WTWTESH473ZSXQEGYPQDWXAYYC4J77OT4NVHJ"; // From networks.testnet.contractId
   const networkPassphrase = Networks.TESTNET;
-  
+
   // Utility functions for ScVal conversion
   const addressToScVal = (address: string) => {
-    // Validate address format
     if (!address.match(/^[CG][A-Z0-9]{55}$/)) {
-      throw new Error(`Invalid address format: ${address}`);
+      throw new AgentKitError(
+        AgentKitErrorCode.INVALID_ADDRESS,
+        `Invalid address format: ${address}`,
+        { to: address }
+      );
     }
     return nativeToScVal(new Address(address), { type: "address" });
   };

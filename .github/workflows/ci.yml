@@ -31,3 +31,6 @@ jobs:
         env:
           STELLAR_PUBLIC_KEY: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
         run: pnpm run test
+
+      - name: Generate API docs
+        run: pnpm run docs:generate

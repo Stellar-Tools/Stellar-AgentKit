@@ -1,7 +1,6 @@
 # Security Policy
 
-Stellar AgentKit takes security seriously, especially due to its interaction
-with financial and blockchain operations.
+Stellar AgentKit takes security seriously, especially due to its interaction with financial and blockchain operations.
 
 ---
 
@@ -33,5 +32,4 @@ This policy applies to:
 
 ## Responsible Disclosure
 
-We appreciate responsible disclosure and will credit reporters
-where appropriate.
+We appreciate responsible disclosure and will credit reporters where appropriate.

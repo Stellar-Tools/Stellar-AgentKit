@@ -20,6 +20,7 @@ import { buildTransactionFromXDR } from "../utils/buildTransaction";
 import * as dotenv from "dotenv";
 import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
+import { AgentKitError, AgentKitErrorCode } from "../lib/errors";
 
 dotenv.config({ path: ".env" });
 
@@ -65,8 +66,10 @@ export const bridgeTokenTool = new DynamicStructuredTool({
       fromNetwork === "stellar-mainnet" &&
       process.env.ALLOW_MAINNET_BRIDGE !== "true"
     ) {
-      throw new Error(
-        "Mainnet bridging is disabled. Set ALLOW_MAINNET_BRIDGE=true in your .env file to enable."
+      throw new AgentKitError(
+        AgentKitErrorCode.NETWORK_BLOCKED,
+        "Mainnet bridging is disabled. Set ALLOW_MAINNET_BRIDGE=true in your .env file to enable.",
+        { network: fromNetwork, amount }
       );
     }
 
