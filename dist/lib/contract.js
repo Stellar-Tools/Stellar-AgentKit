@@ -16,6 +16,7 @@ exports.withdraw = withdraw;
 exports.getReserves = getReserves;
 const stellar_sdk_1 = require("@stellar/stellar-sdk");
 const stellar_1 = require("./stellar");
+const buildTransaction_1 = require("../utils/buildTransaction");
 // Configuration
 const rpcUrl = "https://soroban-testnet.stellar.org";
 const contractAddress = "CCUMBJFVC3YJOW3OOR6WTWTESH473ZSXQEGYPQDWXAYYC4J77OT4NVHJ"; // From networks.testnet.contractId
@@ -42,31 +43,13 @@ const contractInt = (caller, functName, values) => __awaiter(void 0, void 0, voi
             throw new Error(`Failed to fetch account ${caller}: ${err.message}`);
         });
         const contract = new stellar_sdk_1.Contract(contractAddress);
-        const params = {
-            fee: stellar_sdk_1.BASE_FEE,
-            networkPassphrase,
+        // Build transaction using unified builder
+        const sorobanOperation = {
+            contract,
+            functionName: functName,
+            args: values == null ? undefined : Array.isArray(values) ? values : [values],
         };
-        // Build transaction
-        const builder = new stellar_sdk_1.TransactionBuilder(sourceAccount, params);
-        let transaction;
-        if (values == null) {
-            transaction = builder
-                .addOperation(contract.call(functName))
-                .setTimeout(300)
-                .build();
-        }
-        else if (Array.isArray(values)) {
-            transaction = builder
-                .addOperation(contract.call(functName, ...values))
-                .setTimeout(300)
-                .build();
-        }
-        else {
-            transaction = builder
-                .addOperation(contract.call(functName, values))
-                .setTimeout(300)
-                .build();
-        }
+        const transaction = (0, buildTransaction_1.buildTransaction)("lp", sourceAccount, sorobanOperation);
         const simulation = yield server.simulateTransaction(transaction).catch((err) => {
             console.error(`Simulation failed for ${functName}: ${err.message}`);
             throw new Error(`Failed to simulate transaction: ${err.message}`);

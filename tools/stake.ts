@@ -26,7 +26,14 @@ export const StellarContractTool = new DynamicStructuredTool({
     amount: z.number().optional(), // For stake/unstake
     userAddress: z.string().optional(), // For get_stake
   }),
-  func: async ({ action, tokenAddress, rewardRate, amount, userAddress }) => {
+  func: async (input: {
+    action: "initialize" | "stake" | "unstake" | "claim_rewards" | "get_stake";
+    tokenAddress?: string;
+    rewardRate?: number;
+    amount?: number;
+    userAddress?: string;
+  }) => {
+    const { action, tokenAddress, rewardRate, amount, userAddress } = input;
     try {
       switch (action) {
         case "initialize": {
@@ -69,9 +76,9 @@ export const StellarContractTool = new DynamicStructuredTool({
         default:
           throw new Error("Unsupported action");
       }
-    } catch (error: any) {
-      console.error("StellarContractTool error:", error.message);
-      throw new Error(`Failed to execute ${action}: ${error.message}`);
+    } catch (error: unknown) {
+      const msg = (error as Error).message ?? "Unknown error";
+      throw new Error(`Failed to execute ${action}: ${msg}`);
     }
   },
 });

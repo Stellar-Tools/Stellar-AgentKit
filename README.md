@@ -15,6 +15,9 @@ multiple operations into a single programmable and extensible toolkit.
 - Cross-chain bridging
 - Liquidity pool (LP) deposits & withdrawals
 - Querying pool reserves and share IDs
+- **💸 XLM & custom asset payments** (multi-asset, memo support)
+- **💰 Account balance queries** (XLM + all tokens)
+- **🔍 Full account info** (sequence, signers, thresholds, flags)
 - Custom contract integrations (current)
 - Designed for future LP provider integrations
 - Supports Testnet & Mainnet
@@ -298,6 +301,97 @@ const shareId = await agent.lp.getShareId();
 - **Mainnet** - Full support with dual-safeguard system:
   - **Swaps & LP operations:** Require `allowMainnet: true` in AgentClient config
   - **Bridge operations:** Require BOTH `allowMainnet: true` AND `ALLOW_MAINNET_BRIDGE=true` in `.env`
+
+---
+
+## 💸 Payments & Account Info
+
+AgentKit now supports sending payments and querying account balances directly through the `AgentClient`.
+
+### Send XLM
+
+```typescript
+import { AgentClient } from "stellartools";
+
+const agent = new AgentClient({
+  network: "testnet",
+  publicKey: process.env.STELLAR_PUBLIC_KEY,
+});
+
+// STELLAR_PRIVATE_KEY must be set in your .env
+const result = await agent.sendPayment({
+  to: "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGPZS1NPE6GUNLHGQLH1E7",
+  amount: "10",
+});
+console.log(JSON.parse(result));
+// { success: true, hash: "abc123...", network: "testnet", ... }
+```
+
+### Send a Custom Asset (e.g. USDC)
+
+```typescript
+const result = await agent.sendPayment({
+  to: "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGPZS1NPE6GUNLHGQLH1E7",
+  amount: "50",
+  asset_code: "USDC",
+  asset_issuer: "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+  memo: "Invoice #42",
+});
+```
+
+### Get Account Balance
+
+```typescript
+// Query your own balance
+const result = await agent.getBalance();
+const { balances } = JSON.parse(result);
+console.log(balances);
+// [
+//   { asset: "XLM", balance: "99.9999600" },
+//   { asset: "USDC:GA5ZS...", balance: "50.0000000" }
+// ]
+
+// Or query any public key
+const result = await agent.getBalance("GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGPZS1NPE6GUNLHGQLH1E7");
+```
+
+### Get Full Account Info
+
+```typescript
+const result = await agent.getAccountInfo();
+const info = JSON.parse(result);
+console.log(info.sequence);      // "1234567890"
+console.log(info.signers);       // [{ key: "GCEZ...", weight: 1, type: "ed25519_public_key" }]
+console.log(info.balanceCount);  // 2
+```
+
+### Use as LangChain Tools
+
+```typescript
+import { stellarTools } from "stellartools";
+// stellarTools now includes:
+// - stellarSendPaymentTool  (multi-asset, memo, mainnet)
+// - stellarGetBalanceTool   (XLM + tokens for any address)
+// - stellarGetAccountInfoTool (full account details)
+// - bridgeTokenTool, StellarContractTool, StellarLiquidityContractTool
+
+// Pass to your LangChain agent
+const agent = new ChatAgent({ tools: stellarTools });
+```
+
+### Mainnet Payments
+
+```typescript
+// Set ALLOW_MAINNET=true in your .env for mainnet payment safety gate
+const agent = new AgentClient({
+  network: "mainnet",
+  allowMainnet: true,
+  publicKey: process.env.STELLAR_PUBLIC_KEY,
+});
+
+// Will throw unless ALLOW_MAINNET=true is set in env
+await agent.sendPayment({ to: "GCEZ...", amount: "1" });
+```
 
 ---
 
