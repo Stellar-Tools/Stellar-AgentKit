@@ -204,6 +204,10 @@ export class AgentClient {
       const account = await server.loadAccount(key);
       const balances = account.balances.map((b) => {
         if (b.asset_type === "native") return { asset: "XLM", balance: b.balance };
+        if (b.asset_type === "liquidity_pool_shares") {
+          const lp = b as StellarSdk.Horizon.HorizonApi.BalanceLineLiquidityPool;
+          return { asset: `liquidity_pool:${lp.liquidity_pool_id}`, balance: lp.balance };
+        }
         const bal = b as StellarSdk.Horizon.HorizonApi.BalanceLineAsset;
         return { asset: `${bal.asset_code}:${bal.asset_issuer}`, balance: bal.balance };
       });
@@ -251,6 +255,7 @@ export class AgentClient {
         signers: account.signers.map((s) => ({ key: s.key, weight: s.weight, type: s.type })),
         balanceCount: account.balances.length,
         dataEntryCount: Object.keys(account.data_attr).length,
+        dataEntries: account.data_attr,
       };
       return JSON.stringify(info);
     } catch (error) {

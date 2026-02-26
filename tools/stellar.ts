@@ -79,6 +79,9 @@ export const stellarSendPaymentTool = new DynamicStructuredTool({
       if (asset_code && !asset_issuer) {
         throw new Error("asset_issuer is required when asset_code is provided.");
       }
+      if (asset_issuer && !asset_code) {
+        throw new Error("asset_code is required when asset_issuer is provided.");
+      }
       if (asset_issuer && !StellarSdk.StrKey.isValidEd25519PublicKey(asset_issuer)) {
         throw new Error(`Invalid asset_issuer address: ${asset_issuer.slice(0, 8)}...`);
       }

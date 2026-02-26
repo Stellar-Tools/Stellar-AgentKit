@@ -44,6 +44,13 @@ export const stellarGetBalanceTool = new DynamicStructuredTool({
         if (b.asset_type === "native") {
           return { asset: "XLM", balance: b.balance };
         }
+        if (b.asset_type === "liquidity_pool_shares") {
+          const lpBalance = b as StellarSdk.Horizon.HorizonApi.BalanceLineLiquidityPool;
+          return {
+            asset: `liquidity_pool:${lpBalance.liquidity_pool_id}`,
+            balance: lpBalance.balance,
+          };
+        }
         const assetBalance = b as StellarSdk.Horizon.HorizonApi.BalanceLineAsset;
         return {
           asset: `${assetBalance.asset_code}:${assetBalance.asset_issuer}`,
@@ -115,6 +122,7 @@ export const stellarGetAccountInfoTool = new DynamicStructuredTool({
         })),
         balanceCount: account.balances.length,
         dataEntryCount: Object.keys(account.data_attr).length,
+        dataEntries: account.data_attr,
       };
 
       return JSON.stringify(info, null, 2);
