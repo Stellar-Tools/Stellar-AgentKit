@@ -27,6 +27,7 @@ export interface LaunchTokenResult {
   issuerPublicKey: string;
   distributorPublicKey: string;
   initialSupply: string;
+  decimals: number;
   issuerLocked: boolean;
   trustlineHash?: string;
   mintHash?: string;
@@ -76,6 +77,17 @@ export async function launchToken(
       `Context:\n` +
       `  - Issuer secret provided: ${!!issuerSecret}\n` +
       `  - Distributor secret provided: ${!!distributorSecret}`
+    );
+  }
+
+  // Validate decimals (Stellar convention: 0-7)
+  if (decimals < 0 || decimals > 7) {
+    throw new Error(
+      `Invalid decimals: ${decimals}. Stellar supports 0-7 decimal places.\n` +
+      `Context:\n` +
+      `  - Provided decimals: ${decimals}\n` +
+      `  - Valid range: 0-7\n` +
+      `Note: Decimals are a display convention and don't affect on-chain amounts.`
     );
   }
 
@@ -232,6 +244,7 @@ export async function launchToken(
       issuerPublicKey,
       distributorPublicKey,
       initialSupply,
+      decimals,
       issuerLocked: lockIssuer,
       trustlineHash,
       mintHash,

@@ -2,12 +2,6 @@ import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
 import { Horizon } from "@stellar/stellar-sdk";
 
-const STELLAR_PUBLIC_KEY = process.env.STELLAR_PUBLIC_KEY!;
-
-if (!STELLAR_PUBLIC_KEY) {
-  throw new Error("Missing Stellar environment variables");
-}
-
 export interface AssetBalance {
   asset_type: string;
   asset_code?: string;
@@ -80,13 +74,19 @@ export const stellarGetBalanceTool = new DynamicStructuredTool({
     network: "testnet" | "mainnet";
   }) => {
     try {
-      const targetKey = publicKey || STELLAR_PUBLIC_KEY;
+      const targetKey = publicKey || process.env.STELLAR_PUBLIC_KEY;
+      if (!targetKey) {
+        return "Error: No public key provided and STELLAR_PUBLIC_KEY environment variable is not set.";
+      }
       const result = await getAccountBalances(targetKey, network);
 
       // Format output
       const formattedBalances = result.balances.map((b) => {
         if (b.asset_type === "native") {
           return `XLM: ${b.balance}`;
+        } else if (b.asset_type === "liquidity_pool_shares") {
+          // Liquidity pool shares don't have asset_code/asset_issuer
+          return `Liquidity Pool Shares: ${b.balance}`;
         } else {
           return `${b.asset_code} (${b.asset_issuer?.substring(0, 8)}...): ${b.balance}`;
         }

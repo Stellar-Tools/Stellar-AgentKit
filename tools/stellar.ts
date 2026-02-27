@@ -5,15 +5,17 @@ import * as StellarSdk from "stellar-sdk";
 
 /**
  * Send XLM payment
- * @param sender - Sender's public key (will use private key from env)
+ * @param sender - Sender's public key (must match private key from env)
  * @param recipient - Recipient's public key
  * @param amount - Amount of XLM to send
+ * @param network - Network to use (testnet or mainnet)
  * @returns Transaction hash
  */
 export async function sendPayment(
   sender: string,
   recipient: string,
-  amount: string
+  amount: string,
+  network: "testnet" | "mainnet" = "testnet"
 ): Promise<string> {
   // Step 1: Validate inputs
   if (!StellarSdk.StrKey.isValidEd25519PublicKey(recipient)) {
@@ -31,13 +33,28 @@ export async function sendPayment(
   const keypair = StellarSdk.Keypair.fromSecret(privateKey);
   const sourcePublicKey = keypair.publicKey();
 
+  // Validate that sender matches the private key
+  if (sender !== sourcePublicKey) {
+    throw new Error(
+      `Sender mismatch: provided sender ${sender} does not match the public key ` +
+      `derived from STELLAR_PRIVATE_KEY (${sourcePublicKey})`
+    );
+  }
+
   // Step 3: Create an unsigned transaction
-  const server = new StellarSdk.Horizon.Server("https://horizon-testnet.stellar.org");
+  const horizonUrl = network === "mainnet"
+    ? "https://horizon.stellar.org"
+    : "https://horizon-testnet.stellar.org";
+  const server = new StellarSdk.Horizon.Server(horizonUrl);
   const account = await server.loadAccount(sourcePublicKey);
+
+  const networkPassphrase = network === "mainnet"
+    ? StellarSdk.Networks.PUBLIC
+    : StellarSdk.Networks.TESTNET;
 
   const transaction = new StellarSdk.TransactionBuilder(account, {
     fee: StellarSdk.BASE_FEE,
-    networkPassphrase: StellarSdk.Networks.TESTNET,
+    networkPassphrase,
   })
     .addOperation(
       StellarSdk.Operation.payment({
@@ -54,7 +71,7 @@ export async function sendPayment(
   const signedTxXdr = transaction.toXDR();
 
   // Step 5: Submit the transaction
-  const tx = new StellarSdk.Transaction(signedTxXdr, StellarSdk.Networks.TESTNET);
+  const tx = new StellarSdk.Transaction(signedTxXdr, networkPassphrase);
   const response = await server.submitTransaction(tx);
 
   return `Transaction successful! Hash: ${response.hash}`;

@@ -113,7 +113,7 @@ export class AgentClient {
     recipient: string;
     amount: string;
   }) {
-    return await sendPayment(this.publicKey, params.recipient, params.amount);
+    return await sendPayment(this.publicKey, params.recipient, params.amount, this.network);
   }
 
   /**
