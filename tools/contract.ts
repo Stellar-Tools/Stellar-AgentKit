@@ -42,6 +42,17 @@ export const StellarLiquidityContractTool = new DynamicStructuredTool({
     out,
     inMax,
     shareAmount,
+  }: {
+    action: "get_share_id" | "deposit" | "swap" | "withdraw" | "get_reserves";
+    to?: string;
+    desiredA?: string;
+    minA?: string;
+    desiredB?: string;
+    minB?: string;
+    buyA?: boolean;
+    out?: string;
+    inMax?: string;
+    shareAmount?: string;
   }) => {
     try {
       switch (action) {

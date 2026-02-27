@@ -86,21 +86,21 @@ test("should build a stake transaction with default configuration", () => {
 
 test("should apply custom fee configuration", () => {
   const contract = new Contract(mockContractAddress);
-  const tx = buildTransaction("swap", mockAccount, { contract, functionName: "swap", args: [] }, { fee: "1000" });
+  const tx = buildTransaction("swap", mockAccount, { contract, functionName: "swap", args: [] }, Networks.TESTNET, { fee: "1000" });
   expect(tx).toBeDefined();
   expect(tx.operations.length).toBe(1);
 });
 
 test("should apply custom timeout configuration", () => {
   const contract = new Contract(mockContractAddress);
-  const tx = buildTransaction("swap", mockAccount, { contract, functionName: "swap", args: [] }, { timeout: 600 });
+  const tx = buildTransaction("swap", mockAccount, { contract, functionName: "swap", args: [] }, Networks.TESTNET, { timeout: 600 });
   expect(tx).toBeDefined();
   expect(tx.timeBounds?.maxTime).toBeGreaterThan(0);
 });
 
 test("should apply memo configuration", () => {
   const contract = new Contract(mockContractAddress);
-  const tx = buildTransaction("swap", mockAccount, { contract, functionName: "swap", args: [] }, { memo: "test-memo" });
+  const tx = buildTransaction("swap", mockAccount, { contract, functionName: "swap", args: [] }, Networks.TESTNET, { memo: "test-memo" });
   expect(tx).toBeDefined();
   expect(tx.memo).toBeDefined();
 });
@@ -169,7 +169,7 @@ test("should reconstruct transaction from valid XDR string", () => {
 test("should preserve operations when reconstructing from XDR", () => {
   const account = new Account(Keypair.random().publicKey(), "0");
   const contract = new Contract(mockContractAddress);
-  const original = buildTransaction("lp", account, { contract, functionName: "deposit", args: [] }, { memo: "test-memo" });
+  const original = buildTransaction("lp", account, { contract, functionName: "deposit", args: [] }, Networks.TESTNET, { memo: "test-memo" });
   const reconstructed = buildTransactionFromXDR("lp", original.toXDR(), Networks.TESTNET);
   expect(reconstructed).toBeDefined();
   expect(reconstructed.operations.length).toBe(original.operations.length);

@@ -28,7 +28,7 @@ const privateKey = process.env.STELLAR_PRIVATE_KEY as string;
 
 type StellarNetwork = "stellar-testnet" | "stellar-mainnet";
 
-const STELLAR_NETWORK_CONFIG: Record
+const STELLAR_NETWORK_CONFIG: Record<
   StellarNetwork,
   { networkPassphrase: string }
 > = {
@@ -144,7 +144,13 @@ export const bridgeTokenTool = new DynamicStructuredTool({
         confirmRestoreXdrTx.status === rpc.Api.GetTransactionStatus.FAILED
       ) {
         throw new Error(
-          `Restore transaction failed. Hash: ${sentRestoreXdrTx.hash}`
+          `Bridge restore transaction failed.\n` +
+          `Context:\n` +
+          `  - Transaction hash: ${sentRestoreXdrTx.hash}\n` +
+          `  - Amount: ${amount} USDC\n` +
+          `  - From: ${fromAddress}\n` +
+          `  - To: ${toAddress}\n` +
+          `  - Network: ${fromNetwork}`
         );
       }
 
@@ -184,7 +190,16 @@ export const bridgeTokenTool = new DynamicStructuredTool({
     }
 
     if (confirm.status === rpc.Api.GetTransactionStatus.FAILED) {
-      throw new Error(`Transaction failed. Hash: ${sent.hash}`);
+      throw new Error(
+        `Bridge transaction failed.\n` +
+        `Context:\n` +
+        `  - Transaction hash: ${sent.hash}\n` +
+        `  - Amount: ${amount} USDC\n` +
+        `  - From: ${fromAddress} (${fromNetwork})\n` +
+        `  - To: ${toAddress} (Ethereum)\n` +
+        `  - Source token: ${sourceToken.symbol}\n` +
+        `  - Destination token: ${destinationToken.symbol}`
+      );
     }
 
     // TrustLine check and setup for destinationToken if it is SRB

@@ -22,11 +22,17 @@ export const StellarContractTool = new DynamicStructuredTool({
   schema: z.object({
     action: z.enum(["initialize", "stake", "unstake", "claim_rewards", "get_stake"]),
     tokenAddress: z.string().optional(), // Only for initialize
-    rewardRate: z.number().optional(), // Only for initialize
-    amount: z.number().optional(), // For stake/unstake
+    rewardRate: z.string().optional(), // Only for initialize - string to prevent precision loss
+    amount: z.string().optional(), // For stake/unstake - string to prevent precision loss
     userAddress: z.string().optional(), // For get_stake
   }),
-  func: async ({ action, tokenAddress, rewardRate, amount, userAddress }) => {
+  func: async ({ action, tokenAddress, rewardRate, amount, userAddress }: {
+    action: "initialize" | "stake" | "unstake" | "claim_rewards" | "get_stake";
+    tokenAddress?: string;
+    rewardRate?: string;
+    amount?: string;
+    userAddress?: string;
+  }) => {
     try {
       switch (action) {
         case "initialize": {

@@ -23,8 +23,8 @@ import {
     return nativeToScVal(new Address(address), { type: "address" });
   };
   
-  const numberToI128 = (value: number) => {
-    return nativeToScVal(value, { type: "i128" });
+  const numberToI128 = (value: string | bigint) => {
+    return nativeToScVal(BigInt(value), { type: "i128" });
   };
   
   const contractInt = async (caller: string, functName: string, values: any) => {
@@ -88,7 +88,7 @@ import {
   };
   
   // Contract interaction functions
-  async function initialize(caller: string, tokenAddress: string, rewardRate: number) {
+  async function initialize(caller: string, tokenAddress: string, rewardRate: string | bigint) {
     try {
       const tokenScVal = addressToScVal(tokenAddress);
       const rewardRateScVal = numberToI128(rewardRate);
@@ -96,11 +96,21 @@ import {
       return "Contract initialized successfully";
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      return errorMessage;
+
+      // Enhanced error message with context (Issue #3)
+      throw new Error(
+        `Staking contract initialization failed: ${errorMessage}\n` +
+        `Context:\n` +
+        `  - Caller: ${caller}\n` +
+        `  - Token address: ${tokenAddress}\n` +
+        `  - Reward rate: ${rewardRate}\n` +
+        `  - Network: ${networkPassphrase === Networks.TESTNET ? 'testnet' : 'mainnet'}\n` +
+        `  - Contract: ${contractAddress}`
+      );
     }
   }
-  
-  async function stake(caller: string, amount: number) {
+
+  async function stake(caller: string, amount: string | bigint) {
     try {
       const userScVal = addressToScVal(caller);
       const amountScVal = numberToI128(amount);
@@ -108,11 +118,20 @@ import {
       return `Staked ${amount} successfully`;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      return errorMessage;
+
+      // Enhanced error message with context (Issue #3)
+      throw new Error(
+        `Stake operation failed: ${errorMessage}\n` +
+        `Context:\n` +
+        `  - Caller: ${caller}\n` +
+        `  - Amount: ${amount}\n` +
+        `  - Network: ${networkPassphrase === Networks.TESTNET ? 'testnet' : 'mainnet'}\n` +
+        `  - Contract: ${contractAddress}`
+      );
     }
   }
-  
-  async function unstake(caller: string, amount: number) {
+
+  async function unstake(caller: string, amount: string | bigint) {
     try {
       const userScVal = addressToScVal(caller);
       const amountScVal = numberToI128(amount);
@@ -120,7 +139,16 @@ import {
       return `Unstaked ${amount} successfully`;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      return errorMessage;
+
+      // Enhanced error message with context (Issue #3)
+      throw new Error(
+        `Unstake operation failed: ${errorMessage}\n` +
+        `Context:\n` +
+        `  - Caller: ${caller}\n` +
+        `  - Amount: ${amount}\n` +
+        `  - Network: ${networkPassphrase === Networks.TESTNET ? 'testnet' : 'mainnet'}\n` +
+        `  - Contract: ${contractAddress}`
+      );
     }
   }
   
@@ -140,7 +168,6 @@ import {
       const userScVal = addressToScVal(userAddress);
       const result = await contractInt(caller, "get_stake", userScVal);
       return `Stake for ${userAddress}: ${result}`;
-      return result; // Returns i128 as a BigInt
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       return errorMessage; // Returns error message as a string

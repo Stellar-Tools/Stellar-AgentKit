@@ -38,9 +38,10 @@ interface SorobanOperationParams {
  * This function provides a single entry point for building transactions across
  * different operation types (swap, LP, bridge), normalizing fee, timeout, and memo logic.
  *
- * @param operationType - The type of operation: "swap" | "lp" | "bridge"
+ * @param operationType - The type of operation: "swap" | "lp" | "bridge" | "stake"
  * @param sourceAccount - The source account for the transaction
  * @param sorobanOperation - Parameters for the Soroban contract operation
+ * @param networkPassphrase - The network passphrase (Networks.TESTNET or Networks.PUBLIC)
  * @param config - Optional configuration for fee, timeout, and memo
  * @returns A built transaction ready for simulation or signing
  */
@@ -48,6 +49,7 @@ export function buildTransaction(
   operationType: OperationType,
   sourceAccount: Account,
   sorobanOperation: SorobanOperationParams,
+  networkPassphrase: string = Networks.TESTNET,
   config: BuildTransactionConfig = {}
 ): any {
   // Normalize configuration with sensible defaults per operation type
@@ -56,7 +58,6 @@ export function buildTransaction(
   const memo = config.memo;
 
   // Build transaction parameters
-  const networkPassphrase = Networks.TESTNET;
   const memoValue = memo ? Memo.text(memo) : undefined;
   const params = {
     fee,

@@ -183,7 +183,18 @@ import {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("Failed to deposit:", errorMessage);
-      throw error;
+
+      // Enhanced error message with context (Issue #3)
+      throw new Error(
+        `Liquidity deposit failed: ${errorMessage}\n` +
+        `Context:\n` +
+        `  - Caller: ${caller}\n` +
+        `  - Recipient: ${to}\n` +
+        `  - Desired asset A: ${desiredA} (minimum: ${minA})\n` +
+        `  - Desired asset B: ${desiredB} (minimum: ${minB})\n` +
+        `  - Network: ${networkPassphrase === Networks.TESTNET ? 'testnet' : 'mainnet'}\n` +
+        `  - Contract: ${contractAddress}`
+      );
     }
   }
   
@@ -204,7 +215,20 @@ import {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("Failed to swap:", errorMessage);
-      throw error;
+
+      // Enhanced error message with context (Issue #3)
+      const assetDirection = buyA ? "buying asset A" : "buying asset B";
+      throw new Error(
+        `Swap operation failed: ${errorMessage}\n` +
+        `Context:\n` +
+        `  - Caller: ${caller}\n` +
+        `  - Recipient: ${to}\n` +
+        `  - Direction: ${assetDirection}\n` +
+        `  - Output amount requested: ${out}\n` +
+        `  - Maximum input: ${inMax}\n` +
+        `  - Network: ${networkPassphrase === Networks.TESTNET ? 'testnet' : 'mainnet'}\n` +
+        `  - Contract: ${contractAddress}`
+      );
     }
   }
   
@@ -231,7 +255,19 @@ import {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("Failed to withdraw:", errorMessage);
-      throw error;
+
+      // Enhanced error message with context (Issue #3)
+      throw new Error(
+        `Liquidity withdrawal failed: ${errorMessage}\n` +
+        `Context:\n` +
+        `  - Caller: ${caller}\n` +
+        `  - Recipient: ${to}\n` +
+        `  - Share amount: ${shareAmount}\n` +
+        `  - Minimum asset A: ${minA}\n` +
+        `  - Minimum asset B: ${minB}\n` +
+        `  - Network: ${networkPassphrase === Networks.TESTNET ? 'testnet' : 'mainnet'}\n` +
+        `  - Contract: ${contractAddress}`
+      );
     }
   }
   
