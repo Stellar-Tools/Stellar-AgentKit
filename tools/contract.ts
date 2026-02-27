@@ -10,16 +10,11 @@ import {
 import { AgentKitError, AgentKitErrorCode, isAgentKitError } from "../lib/errors";
 
 // Assuming env variables are already loaded elsewhere
-const STELLAR_PUBLIC_KEY = process.env.STELLAR_PUBLIC_KEY!;
-
-if (!STELLAR_PUBLIC_KEY) {
-  throw new Error("Missing Stellar environment variables");
-}
+const getPublicKey = () => process.env.STELLAR_PUBLIC_KEY!;
 
 export const StellarLiquidityContractTool = new DynamicStructuredTool({
   name: "stellar_liquidity_contract_tool",
-  description:
-    "Interact with a liquidity contract on Stellar Soroban: getShareId, deposit, swap, withdraw, getReserves.",
+  description: "Perform decentralized exchange (DEX) operations on Stellar liquidity pools. Use this for swapping assets, or for depositing and withdrawing liquidity. Supports getShareId, deposit, swap, withdraw, and getReserves.",
   schema: z.object({
     action: z.enum(["get_share_id", "deposit", "swap", "withdraw", "get_reserves"]),
     to: z.string().optional(), // For deposit, swap, withdraw
@@ -59,43 +54,53 @@ export const StellarLiquidityContractTool = new DynamicStructuredTool({
     try {
       switch (action) {
         case "get_share_id": {
-          const result = await getShareId(STELLAR_PUBLIC_KEY);
+          const publicKey = getPublicKey();
+          if (!publicKey) throw new Error("Missing STELLAR_PUBLIC_KEY");
+          const result = await getShareId(publicKey);
           return result ?? "No share ID found.";
         }
         case "deposit": {
+          const publicKey = getPublicKey();
+          if (!publicKey) throw new Error("Missing STELLAR_PUBLIC_KEY");
           if (!to || !desiredA || !minA || !desiredB || !minB) {
             throw new AgentKitError(
               AgentKitErrorCode.TOOL_EXECUTION_FAILED,
               "to, desiredA, minA, desiredB, and minB are required for deposit"
             );
           }
-          const result = await deposit(STELLAR_PUBLIC_KEY, to, desiredA, minA, desiredB, minB);
+          const result = await deposit(publicKey, to, desiredA, minA, desiredB, minB);
           return result ??`Deposited successfully to ${to}.`;
         }
         case "swap": {
+          const publicKey = getPublicKey();
+          if (!publicKey) throw new Error("Missing STELLAR_PUBLIC_KEY");
           if (!to || buyA === undefined || !out || !inMax) {
             throw new AgentKitError(
               AgentKitErrorCode.TOOL_EXECUTION_FAILED,
               "to, buyA, out, and inMax are required for swap"
             );
           }
-          const result=await swap(STELLAR_PUBLIC_KEY, to, buyA, out, inMax);
+          const result=await swap(publicKey, to, buyA, out, inMax);
           return result ?? `Swapped successfully to ${to}.`;
         }
         case "withdraw": {
+          const publicKey = getPublicKey();
+          if (!publicKey) throw new Error("Missing STELLAR_PUBLIC_KEY");
           if (!to || !shareAmount || !minA || !minB) {
             throw new AgentKitError(
               AgentKitErrorCode.TOOL_EXECUTION_FAILED,
               "to, shareAmount, minA, and minB are required for withdraw"
             );
           }
-          const result = await withdraw(STELLAR_PUBLIC_KEY, to, shareAmount, minA, minB);
+          const result = await withdraw(publicKey, to, shareAmount, minA, minB);
           return result
             ? `Withdrawn successfully to ${to}: ${JSON.stringify(result)}`
             : "Withdraw failed or returned no value.";
         }
         case "get_reserves": {
-          const result = await getReserves(STELLAR_PUBLIC_KEY);
+          const publicKey = getPublicKey();
+          if (!publicKey) throw new Error("Missing STELLAR_PUBLIC_KEY");
+          const result = await getReserves(publicKey);
           return result
             ? `Reserves: ${JSON.stringify(result)}`
             : "No reserves found.";

@@ -1,7 +1,8 @@
 /**
  * AgentKitError integration: swap invalid address, LP tool missing params, bridge mainnet guard.
  */
-import { AgentClient, AgentKitError, AgentKitErrorCode } from "../index";
+import { AgentClient } from "../agent";
+import { AgentKitError, AgentKitErrorCode } from "../lib/errors";
 import * as contractTool from "../tools/contract";
 
 let passed = 0;
@@ -15,26 +16,30 @@ function test(name: string, fn: () => void | Promise<void>) {
       passed++;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.log(`❌ ${name}\n   → ${msg}`);
+      const nameAttr = (e as any).name || "Unknown";
+      console.log(`❌ ${name}\n   → [${nameAttr}] ${msg}`);
+      if (e instanceof Error && e.stack && !msg.includes("Expected")) {
+          console.log(e.stack);
+      }
       failed++;
     }
   };
   return run();
 }
 
-function expect(actual: unknown) {
+function expect(actual: unknown, label?: string) {
   return {
     toBeDefined: () => {
       if (actual === undefined || actual === null)
-        throw new Error(`Expected value to be defined, got ${actual}`);
+        throw new Error(`${label || 'Value'} expected to be defined, got ${actual}`);
     },
     toBe: (expected: unknown) => {
       if (actual !== expected)
-        throw new Error(`Expected ${expected}, got ${actual}`);
+        throw new Error(`${label || 'Value'} expected ${expected}, got ${actual}`);
     },
     toContain: (sub: string) => {
       if (typeof actual !== "string" || !actual.includes(sub))
-        throw new Error(`Expected string to contain "${sub}", got ${actual}`);
+        throw new Error(`${label || 'String'} expected to contain "${sub}", got ${actual}`);
     },
   };
 }
@@ -54,11 +59,11 @@ async function runTests() {
       });
       throw new Error("Expected swap to throw");
     } catch (e) {
-      expect(e instanceof AgentKitError).toBe(true);
       const err = e as AgentKitError;
-      expect(err.code).toBe(AgentKitErrorCode.INVALID_ADDRESS);
-      expect(err.context).toBeDefined();
-      expect(err.message.toLowerCase()).toContain("invalid address format");
+      expect(err.name === "AgentKitError", "Error name").toBe(true);
+      expect(err.code, "Error code").toBe(AgentKitErrorCode.INVALID_ADDRESS);
+      expect(err.context, "Error context").toBeDefined();
+      expect(err.message.toLowerCase(), "Error message").toContain("address format");
     }
   });
 
@@ -72,9 +77,10 @@ async function runTests() {
       throw new Error("Expected swap to throw");
     } catch (e) {
       const err = e as AgentKitError;
-      expect(err.code).toBe(AgentKitErrorCode.INVALID_ADDRESS);
-      expect(err.context).toBeDefined();
-      expect(err.context!.to).toBe("bad");
+      expect(err.name === "AgentKitError", "Error name").toBe(true);
+      expect(err.code, "Error code").toBe(AgentKitErrorCode.INVALID_ADDRESS);
+      expect(err.context, "Error context").toBeDefined();
+      expect(err.context!.to, "Context 'to'").toBe("bad");
     }
   });
 
@@ -88,9 +94,9 @@ async function runTests() {
       });
       throw new Error("Expected tool to throw");
     } catch (e) {
-      expect(e instanceof AgentKitError).toBe(true);
       const err = e as AgentKitError;
-      expect(err.code).toBe(AgentKitErrorCode.TOOL_EXECUTION_FAILED);
+      expect(err.name === "AgentKitError", "Error name").toBe(true);
+      expect(err.code, "Error code").toBe(AgentKitErrorCode.TOOL_EXECUTION_FAILED);
     }
   });
 
@@ -105,9 +111,43 @@ async function runTests() {
       });
       throw new Error("Expected tool to throw");
     } catch (e) {
-      expect(e instanceof AgentKitError).toBe(true);
       const err = e as AgentKitError;
-      expect(err.code).toBe(AgentKitErrorCode.TOOL_EXECUTION_FAILED);
+      expect(err.name === "AgentKitError", "Error name").toBe(true);
+      expect(err.code, "Error code").toBe(AgentKitErrorCode.TOOL_EXECUTION_FAILED);
+    }
+  });
+
+  await test("stake.getStake with invalid address throws AgentKitError INVALID_ADDRESS", async () => {
+    const agent = new AgentClient({
+      network: "testnet",
+      publicKey: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    });
+    try {
+      await agent.stake.getStake("bad");
+      throw new Error("Expected stake.getStake to throw");
+    } catch (e) {
+      const err = e as AgentKitError;
+      expect(err.name === "AgentKitError", "Error name").toBe(true);
+      expect(err.code, "Error code").toBe(AgentKitErrorCode.INVALID_ADDRESS);
+      expect(err.context, "Error context").toBeDefined();
+      expect(err.context!.to, "Context 'to'").toBe("bad");
+    }
+  });
+
+  await test("LP tool deposit with missing minA throws AgentKitError TOOL_EXECUTION_FAILED", async () => {
+    try {
+      await contractTool.StellarLiquidityContractTool.invoke({
+        action: "deposit",
+        to: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        desiredA: "10",
+        desiredB: "10",
+        minB: "9",
+      });
+      throw new Error("Expected tool to throw");
+    } catch (e) {
+      const err = e as AgentKitError;
+      expect(err.name === "AgentKitError", "Error name").toBe(true);
+      expect(err.code, "Error code").toBe(AgentKitErrorCode.TOOL_EXECUTION_FAILED);
     }
   });
 
@@ -123,11 +163,12 @@ async function runTests() {
       await agent.bridge({ amount: "10", toAddress: "0x123" });
       throw new Error("Expected bridge to throw");
     } catch (e) {
-      expect(e instanceof AgentKitError).toBe(true);
       const err = e as AgentKitError;
-      expect(err.code).toBe(AgentKitErrorCode.NETWORK_BLOCKED);
-      expect(err.context!.network).toBe("stellar-mainnet");
-      expect(err.context!.amount).toBe("10");
+      expect(err.name === "AgentKitError", "Error name").toBe(true);
+      expect(err.code, "Error code").toBe(AgentKitErrorCode.NETWORK_BLOCKED);
+      expect(err.context, "Error context").toBeDefined();
+      expect(err.context!.network, "Context network").toBe("stellar-mainnet");
+      expect(err.context!.amount, "Context amount").toBe("10");
     } finally {
       process.env.ALLOW_MAINNET_BRIDGE = prev;
     }

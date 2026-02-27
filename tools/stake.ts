@@ -9,16 +9,11 @@ import {
 } from "../lib/stakeF";
 
 // Assuming env variables are already loaded elsewhere
-const STELLAR_PUBLIC_KEY = process.env.STELLAR_PUBLIC_KEY!;
-
-if (!STELLAR_PUBLIC_KEY) {
-  throw new Error("Missing Stellar environment variables");
-}
+const getPublicKey = () => process.env.STELLAR_PUBLIC_KEY!;
 
 export const StellarContractTool = new DynamicStructuredTool({
   name: "stellar_contract_tool",
-  description:
-    "Interact with a staking contract on Stellar Soroban: initialize, stake, unstake, claim rewards, or get stake.",
+  description: "Interact with Stellar Staking Smart Contracts. Use this to initialize a staking pool, deposit assets to earn yield, unstake assets, or claim accrued rewards. Supports initialize, stake, unstake, claim_rewards, and get_stake.",
   schema: z.object({
     action: z.enum(["initialize", "stake", "unstake", "claim_rewards", "get_stake"]),
     tokenAddress: z.string().optional(), // Only for initialize
@@ -37,39 +32,49 @@ export const StellarContractTool = new DynamicStructuredTool({
     try {
       switch (action) {
         case "initialize": {
+          const publicKey = getPublicKey();
+          if (!publicKey) throw new Error("Missing STELLAR_PUBLIC_KEY");
           if (!tokenAddress || rewardRate === undefined) {
             throw new Error("tokenAddress and rewardRate are required for initialize");
           }
-          const result = await initialize(STELLAR_PUBLIC_KEY, tokenAddress, rewardRate);
+          const result = await initialize(publicKey, tokenAddress, rewardRate);
           return result ?? "Contract initialized successfully.";
         }
 
         case "stake": {
+          const publicKey = getPublicKey();
+          if (!publicKey) throw new Error("Missing STELLAR_PUBLIC_KEY");
           if (amount === undefined) {
             throw new Error("amount is required for stake");
           }
-          const result = await stake(STELLAR_PUBLIC_KEY, amount);
+          const result = await stake(publicKey, amount);
           return result ?? `Staked ${amount} successfully.`;
         }
 
         case "unstake": {
+          const publicKey = getPublicKey();
+          if (!publicKey) throw new Error("Missing STELLAR_PUBLIC_KEY");
           if (amount === undefined) {
             throw new Error("amount is required for unstake");
           }
-          const result = await unstake(STELLAR_PUBLIC_KEY, amount);
+          const result = await unstake(publicKey, amount);
           return result ?? `Unstaked ${amount} successfully.`;
         }
 
         case "claim_rewards": {
-          const result = await claimRewards(STELLAR_PUBLIC_KEY);
+          const publicKey = getPublicKey();
+          if (!publicKey) throw new Error("Missing STELLAR_PUBLIC_KEY");
+          const result = await claimRewards(publicKey);
           return result ?? "Rewards claimed successfully.";
         }
 
         case "get_stake": {
+          const publicKey = getPublicKey();
+          if (!publicKey) throw new Error("Missing STELLAR_PUBLIC_KEY");
           if (!userAddress) {
             throw new Error("userAddress is required for get_stake");
           }
-          const stakeAmount = await getStake(STELLAR_PUBLIC_KEY, userAddress);
+          const stakeAmount = await getStake(publicKey, userAddress);
           return `Stake for ${userAddress}: ${stakeAmount}`;
         }
 

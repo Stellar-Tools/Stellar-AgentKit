@@ -24,8 +24,7 @@ import { AgentKitError, AgentKitErrorCode } from "../lib/errors";
 
 dotenv.config({ path: ".env" });
 
-const fromAddress = process.env.STELLAR_PUBLIC_KEY as string;
-const privateKey = process.env.STELLAR_PRIVATE_KEY as string;
+// Environment variables will be checked inside the tool function
 
 type StellarNetwork = "stellar-testnet" | "stellar-mainnet";
 
@@ -40,8 +39,7 @@ const STELLAR_NETWORK_CONFIG: Record<StellarNetwork, { networkPassphrase: string
 
 export const bridgeTokenTool = new DynamicStructuredTool({
   name: "bridge_token",
-  description:
-    "Bridge token from Stellar chain to EVM compatible chains. Requires amount and toAddress as string",
+  description: "Bridge tokens (like USDC) from Stellar chain to EVM-compatible chains (like Ethereum). Use this when the user wants to move assets cross-chain. Requires amount, destination EVM address, and asset symbol.",
 
   schema: z.object({
     amount: z.string().describe("The amount of tokens to bridge"),
@@ -50,17 +48,30 @@ export const bridgeTokenTool = new DynamicStructuredTool({
       .enum(["stellar-testnet", "stellar-mainnet"])
       .default("stellar-testnet")
       .describe("Source Stellar network"),
+    assetSymbol: z.string().default("USDC").describe("The asset symbol to bridge (e.g., USDC, XLM)"),
   }),
 
   func: async ({
     amount,
     toAddress,
     fromNetwork,
+    assetSymbol,
   }: {
     amount: string;
     toAddress: string;
     fromNetwork: StellarNetwork;
+    assetSymbol: string;
   }) => {
+    const fromAddress = process.env.STELLAR_PUBLIC_KEY as string;
+    const privateKey = process.env.STELLAR_PRIVATE_KEY as string;
+
+    if (!fromAddress || !privateKey) {
+      throw new AgentKitError(
+        AgentKitErrorCode.TOOL_EXECUTION_FAILED,
+        "Missing Stellar public or private key in environment."
+      );
+    }
+
     // Mainnet safeguard - additional layer beyond AgentClient
     if (
       fromNetwork === "stellar-mainnet" &&
@@ -82,13 +93,15 @@ export const bridgeTokenTool = new DynamicStructuredTool({
 
     const sourceToken = ensure(
       chainDetailsMap[ChainSymbol.SRB].tokens.find(
-        (t) => t.symbol === "USDC"
-      )
+        (t) => t.symbol === assetSymbol
+      ),
+      `Asset ${assetSymbol} not found on Stellar (SRB)`
     );
     const destinationToken = ensure(
       chainDetailsMap[ChainSymbol.ETH].tokens.find(
-        (t) => t.symbol === "USDC"
-      )
+        (t) => t.symbol === assetSymbol
+      ),
+      `Asset ${assetSymbol} not found on Ethereum (ETH)`
     );
 
     const sendParams = {
@@ -107,7 +120,6 @@ export const bridgeTokenTool = new DynamicStructuredTool({
       sendParams
     )) as string;
 
-    // Use unified transaction builder for XDR-based bridge operations
     const srbKeypair = Keypair.fromSecret(privateKey);
     const transaction = buildTransactionFromXDR(
       "bridge",

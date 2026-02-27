@@ -5,7 +5,7 @@ import * as StellarSdk from "stellar-sdk";
 
 export const stellarSendPaymentTool = new DynamicStructuredTool({
   name: "stellar_send_payment",
-  description: "Send a payment on the Stellar testnet. Requires recipient address and amount.",
+  description: "Send a direct payment (XLM) to another address on the Stellar network. Use this for simple peer-to-peer transfers or funding accounts. Requires a valid recipient 'G...' address and amount.",
   schema: z.object({
     recipient: z.string().describe("The Stellar address to send to"),
     amount: z.string().describe("The amount of XLM to send (as a string)"),

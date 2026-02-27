@@ -13,14 +13,12 @@ exports.StellarLiquidityContractTool = void 0;
 const tools_1 = require("@langchain/core/tools");
 const zod_1 = require("zod");
 const contract_1 = require("../lib/contract");
+const errors_1 = require("../lib/errors");
 // Assuming env variables are already loaded elsewhere
-const STELLAR_PUBLIC_KEY = process.env.STELLAR_PUBLIC_KEY;
-if (!STELLAR_PUBLIC_KEY) {
-    throw new Error("Missing Stellar environment variables");
-}
+const getPublicKey = () => process.env.STELLAR_PUBLIC_KEY;
 exports.StellarLiquidityContractTool = new tools_1.DynamicStructuredTool({
     name: "stellar_liquidity_contract_tool",
-    description: "Interact with a liquidity contract on Stellar Soroban: getShareId, deposit, swap, withdraw, getReserves.",
+    description: "Perform decentralized exchange (DEX) operations on Stellar liquidity pools. Use this for swapping assets, or for depositing and withdrawing liquidity. Supports getShareId, deposit, swap, withdraw, and getReserves.",
     schema: zod_1.z.object({
         action: zod_1.z.enum(["get_share_id", "deposit", "swap", "withdraw", "get_reserves"]),
         to: zod_1.z.string().optional(), // For deposit, swap, withdraw
@@ -33,49 +31,68 @@ exports.StellarLiquidityContractTool = new tools_1.DynamicStructuredTool({
         inMax: zod_1.z.string().optional(), // For swap
         shareAmount: zod_1.z.string().optional(), // For withdraw
     }),
-    func: (_a) => __awaiter(void 0, [_a], void 0, function* ({ action, to, desiredA, minA, desiredB, minB, buyA, out, inMax, shareAmount, }) {
+    func: (input) => __awaiter(void 0, void 0, void 0, function* () {
+        const { action, to, desiredA, minA, desiredB, minB, buyA, out, inMax, shareAmount, } = input;
         try {
             switch (action) {
                 case "get_share_id": {
-                    const result = yield (0, contract_1.getShareId)(STELLAR_PUBLIC_KEY);
+                    const publicKey = getPublicKey();
+                    if (!publicKey)
+                        throw new Error("Missing STELLAR_PUBLIC_KEY");
+                    const result = yield (0, contract_1.getShareId)(publicKey);
                     return result !== null && result !== void 0 ? result : "No share ID found.";
                 }
                 case "deposit": {
+                    const publicKey = getPublicKey();
+                    if (!publicKey)
+                        throw new Error("Missing STELLAR_PUBLIC_KEY");
                     if (!to || !desiredA || !minA || !desiredB || !minB) {
-                        throw new Error("to, desiredA, minA, desiredB, and minB are required for deposit");
+                        throw new errors_1.AgentKitError(errors_1.AgentKitErrorCode.TOOL_EXECUTION_FAILED, "to, desiredA, minA, desiredB, and minB are required for deposit");
                     }
-                    yield (0, contract_1.deposit)(STELLAR_PUBLIC_KEY, to, desiredA, minA, desiredB, minB);
-                    return `Deposited successfully to ${to}.`;
+                    const result = yield (0, contract_1.deposit)(publicKey, to, desiredA, minA, desiredB, minB);
+                    return result !== null && result !== void 0 ? result : `Deposited successfully to ${to}.`;
                 }
                 case "swap": {
+                    const publicKey = getPublicKey();
+                    if (!publicKey)
+                        throw new Error("Missing STELLAR_PUBLIC_KEY");
                     if (!to || buyA === undefined || !out || !inMax) {
-                        throw new Error("to, buyA, out, and inMax are required for swap");
+                        throw new errors_1.AgentKitError(errors_1.AgentKitErrorCode.TOOL_EXECUTION_FAILED, "to, buyA, out, and inMax are required for swap");
                     }
-                    yield (0, contract_1.swap)(STELLAR_PUBLIC_KEY, to, buyA, out, inMax);
-                    return `Swapped successfully to ${to}.`;
+                    const result = yield (0, contract_1.swap)(publicKey, to, buyA, out, inMax);
+                    return result !== null && result !== void 0 ? result : `Swapped successfully to ${to}.`;
                 }
                 case "withdraw": {
+                    const publicKey = getPublicKey();
+                    if (!publicKey)
+                        throw new Error("Missing STELLAR_PUBLIC_KEY");
                     if (!to || !shareAmount || !minA || !minB) {
-                        throw new Error("to, shareAmount, minA, and minB are required for withdraw");
+                        throw new errors_1.AgentKitError(errors_1.AgentKitErrorCode.TOOL_EXECUTION_FAILED, "to, shareAmount, minA, and minB are required for withdraw");
                     }
-                    const result = yield (0, contract_1.withdraw)(STELLAR_PUBLIC_KEY, to, shareAmount, minA, minB);
+                    const result = yield (0, contract_1.withdraw)(publicKey, to, shareAmount, minA, minB);
                     return result
                         ? `Withdrawn successfully to ${to}: ${JSON.stringify(result)}`
                         : "Withdraw failed or returned no value.";
                 }
                 case "get_reserves": {
-                    const result = yield (0, contract_1.getReserves)(STELLAR_PUBLIC_KEY);
+                    const publicKey = getPublicKey();
+                    if (!publicKey)
+                        throw new Error("Missing STELLAR_PUBLIC_KEY");
+                    const result = yield (0, contract_1.getReserves)(publicKey);
                     return result
                         ? `Reserves: ${JSON.stringify(result)}`
                         : "No reserves found.";
                 }
                 default:
-                    throw new Error("Unsupported action");
+                    throw new errors_1.AgentKitError(errors_1.AgentKitErrorCode.TOOL_EXECUTION_FAILED, "Unsupported action");
             }
         }
         catch (error) {
-            console.error("StellarLiquidityContractTool error:", error.message);
-            throw new Error(`Failed to execute ${action}: ${error.message}`);
+            if ((0, errors_1.isAgentKitError)(error))
+                throw error;
+            const msg = error instanceof Error ? error.message : String(error);
+            console.error("StellarLiquidityContractTool error:", msg);
+            throw new errors_1.AgentKitError(errors_1.AgentKitErrorCode.TOOL_EXECUTION_FAILED, `Failed to execute ${action}: ${msg}`, undefined, error instanceof Error ? error : undefined);
         }
     }),
 });

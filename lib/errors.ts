@@ -10,6 +10,10 @@ export const AgentKitErrorCode = {
   VALIDATION: "VALIDATION",
   NETWORK_BLOCKED: "NETWORK_BLOCKED",
   TOOL_EXECUTION_FAILED: "TOOL_EXECUTION_FAILED",
+  INVALID_DECIMALS: "INVALID_DECIMALS",
+  INVALID_SUPPLY: "INVALID_SUPPLY",
+  TRUSTLINE_FAILED: "TRUSTLINE_FAILED",
+  MINT_FAILED: "MINT_FAILED",
 } as const;
 
 export type AgentKitErrorCodeType = (typeof AgentKitErrorCode)[keyof typeof AgentKitErrorCode];
@@ -22,15 +26,21 @@ export interface AgentKitErrorContext {
 }
 
 export class AgentKitError extends Error {
+  public readonly code: AgentKitErrorCodeType;
+  public readonly context?: AgentKitErrorContext;
+  public readonly cause?: Error;
+
   constructor(
-    public readonly code: AgentKitErrorCodeType,
+    code: AgentKitErrorCodeType,
     message: string,
-    public readonly context?: AgentKitErrorContext,
-    public readonly cause?: Error
+    context?: AgentKitErrorContext,
+    cause?: Error
   ) {
     super(message);
+    this.code = code;
+    this.context = context;
+    this.cause = cause;
     this.name = "AgentKitError";
-    Object.setPrototypeOf(this, AgentKitError.prototype);
   }
 }
 

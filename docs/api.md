@@ -15,6 +15,8 @@ new AgentClient(config: AgentConfig)
 - `config.network`: `"testnet" | "mainnet"` - The Stellar network to connect to.
 - `config.publicKey`: `string` (optional) - The public key of the account performing operations. Defaults to `STELLAR_PUBLIC_KEY` environment variable.
 - `config.rpcUrl`: `string` (optional) - Custom RPC URL for Soroban interactions.
+- `config.allowMainnet`: `boolean` (optional) - Required to enable any mainnet operations.
+- `config.allowMainnetTokenIssuance`: `boolean` (optional) - Additional safeguard specifically for mainnet token launch.
 
 **Example:**
 
@@ -74,6 +76,24 @@ await agent.bridge({
 });
 ```
 
+#### `launchToken(params)`
+
+Creates a new Stellar classic asset (issuer, trustline, and initial mint).
+
+**Parameters:**
+
+- `params.symbol`: `string` - 1-12 alphanumeric characters for the asset code.
+- `params.initialSupply`: `string` - Initial amount to mint.
+- `params.decimals`: `number` (optional) - Asset decimals (0-7, default 7).
+- `params.issuerSecretKey`: `string` - Private key of the issuing account.
+- `params.distributorPublicKey`: `string` - Public key of the account to receive initial supply.
+- `params.distributorSecretKey`: `string` (optional) - Required if the trustline needs to be created automatically.
+
+**Returns:** `Promise<any>`
+
+**Guardrails:**
+Mainnet issuance requires `allowMainnetTokenIssuance: true` and `ALLOW_MAINNET_TOKEN_ISSUANCE=true` in `.env`.
+
 ---
 
 ### Liquidity Pool (LP) Operations
@@ -119,14 +139,13 @@ Returns the share ID of the liquidity pool.
 
 ## Error contract
 
-The following table summarizes when methods throw and what to expect. All throwing methods use JavaScript `Error`; the message is descriptive.
+The following table summarizes when methods throw and what to expect.
 
-| Method / context | When it throws | Typical message or condition |
-|------------------|----------------|-------------------------------|
-| `new AgentClient({ network: "mainnet" })` | Mainnet without opt-in | `"Mainnet execution blocked"`, `"allowMainnet"` |
-| `swap(params)` | Invalid `params.to` (not `G...`/`C...` 56 chars) | `"Invalid address format: ..."` |
-| `lp.deposit(params)` | Invalid `params.to` | `"Invalid address format: ..."` |
-| `lp.withdraw(params)` | Invalid `params.to` | `"Invalid address format: ..."` |
-| Contract / RPC (swap, deposit, withdraw) | Simulation or send failure | `"Simulation failed"`, `"Failed to prepare transaction"`, `"Transaction failed"`, etc. |
-| `bridge(params)` | Mainnet bridge without `ALLOW_MAINNET_BRIDGE=true` | Bridge SDK or config error |
-| `bridge(params)` | RPC or bridge API failure | SDK-specific error message |
+| Method / context                          | When it throws                                     | Typical message or condition                 |
+| ----------------------------------------- | -------------------------------------------------- | -------------------------------------------- |
+| `new AgentClient({ network: "mainnet" })` | Mainnet without `allowMainnet: true`               | `"🚫 Mainnet execution blocked for safety."` |
+| `launchToken(params)`                     | Mainnet without dual-safeguards                    | `"Token issuance on mainnet is disabled."`   |
+| `launchToken(params)`                     | Invalid decimals or symbol                         | `invalid_decimals`, `invalid_address`        |
+| `swap(params)`                            | Invalid address format                             | `invalid_address`                            |
+| `bridge(params)`                          | Mainnet bridge without `ALLOW_MAINNET_BRIDGE=true` | `"Mainnet bridging is disabled."`            |
+| All tools                                 | Missing `STELLAR_PUBLIC_KEY` during execution      | `"Missing STELLAR_PUBLIC_KEY"`               |

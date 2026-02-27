@@ -1,370 +1,153 @@
 # Stellar AgentKit 🌟
 
-Stellar AgentKit is an open-source SDK and platform for interacting with the Stellar blockchain,
-providing a unified agent to perform complex DeFi operations such as swaps, bridges, and liquidity
-pool (LP) actions.
+> **Building the Future of Autonomous DeFi on Stellar**
 
-Built for both developers and end users, AgentKit simplifies Stellar-based DeFi by consolidating
-multiple operations into a single programmable and extensible toolkit.
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Stellar](https://img.shields.io/badge/Blockchain-Stellar-black.svg)](https://stellar.org)
+[![DeFi](https://img.shields.io/badge/Focus-DeFi%20Agents-blueviolet.svg)](#)
 
----
-
-## ✨ Features
-
-- Token swaps on Stellar
-- Cross-chain bridging
-- Liquidity pool (LP) deposits & withdrawals
-- Querying pool reserves and share IDs
-- Custom contract integrations (current)
-- Designed for future LP provider integrations
-- Supports Testnet & Mainnet
+Stellar AgentKit is an industry-grade SDK and framework designed for developers building **Autonomous AI Agents** on the Stellar blockchain. It abstracts complex DeFi operations into a unified, resilient, and extensible interface.
 
 ---
 
-## 🧠 What is AgentKit?
+## 🏗️ Technical Architecture
 
-AgentKit abstracts complex Stellar operations into a **single agent interface** that can be:
+```mermaid
+graph TD
+    User([User / AI Agent]) --> AgentClient[AgentClient]
 
-- Embedded by developers into dApps
-- Used by consumers via a user-friendly platform
-- Extended with new contracts, tools, and workflows
+    subgraph "Core SDK Layers"
+        AgentClient --> Tools[Stellar Tools Layer]
+        Tools --> Lib[Logic Library]
+        Lib --> Horizon[Horizon / Soroban RPC]
+    end
 
-This repository contains the **core SDK**, including utilities such as `stellarTools`.
+    subgraph "Capabilities"
+        Tools --> Bridge[Multi-Asset Bridge]
+        Tools --> Swap[DEX Swap]
+        Tools --> Stake[Staking / Yield]
+        Tools --> Issue[Token Issuance]
+        Tools --> Account[Account & Balance]
+    end
+
+    subgraph "Resilience"
+        Lib --> Retry[Exponential Backoff Retry]
+        Lib --> Validation[Address & Input Validation]
+        Lib --> ErrorMap[Human-Friendly Errors]
+    end
+```
+
+---
+
+## ✨ Key Features
+
+### 🛡️ Production-Ready Resilience
+
+- **Exponential Backoff Retry**: Automatic recovery from network timeouts and rate limits.
+- **Robust Validation**: Built-in Stellar address (G...) and secret (S...) validation.
+- **Human-Friendly Errors**: Translates technical codes like `op_no_trust` into actionable advice.
+
+### 🏦 Comprehensive DeFi Tools
+
+- **Deep DEX Integration**: Standardized swaps and Liquidity Pool (LP) management.
+- **Smart Staking**: Initialize, deposit, and claim rewards on Stellar smart contracts.
+- **Cross-Chain Bridge**: Multi-asset bridging between Stellar and Ethereum via Allbridge.
+- **Token Factory**: Launch custom Stellar assets with dual-safeguard protection.
+
+### 🤖 Agent-First Design
+
+- **Multi-Agent Orchestration**: Specialized "Analyst" and "Executor" hiyerarşisi desteği.
+- **Autonomous UX**: Automatic trustline detection and creation before transactions.
+- **LLM-Optimized**: Tool descriptions designed for seamless integration with GPT, Claude, and Gemini.
 
 ---
 
 ## 📦 Installation
+
 ```bash
 npm i stellartools
 ```
 
-or
+---
 
-```bash
-bun add stellartools
+## 🚀 Quick Start (Autonomous Example)
+
+```typescript
+import { AgentClient } from "stellartools";
+
+const agent = new AgentClient({
+  network: "testnet",
+  publicKey: "G...",
+});
+
+// 1. Check Portfolio
+const balances = await agent.getBalances();
+
+// 2. Ensure Environment is Ready (Auto-Trustline)
+await agent.ensureTrustline({
+  assetCode: "USDC",
+  assetIssuer: "G...",
+});
+
+// 3. Execute Resilient Swap
+await agent.swap({
+  to: "G...",
+  buyA: true,
+  out: "100",
+  inMax: "110",
+});
 ```
 
 ---
 
-## 🚀 Quick Start
+## 🌉 Multi-Asset Bridging (Dual-Safeguard)
 
-### Testnet (Safe for Testing)
-
-```typescript
-import { AgentClient } from "stellar-agentkit";
-
-const agent = new AgentClient({
-  network: "testnet",
-});
-
-await agent.swap({
-  to: "recipient_address",
-  buyA: true,
-  out: "100",
-  inMax: "110"
-});
-```
-
-### Mainnet (Real Funds - Requires Explicit Opt-in)
-
-⚠️ **Safety Notice:** Mainnet operations require the `allowMainnet: true` flag to prevent accidental execution with real funds.
+Bridging on Mainnet requires explicit environment-level and code-level opt-ins for maximum safety.
 
 ```typescript
-import { AgentClient } from "stellar-agentkit";
-
 const agent = new AgentClient({
   network: "mainnet",
-  allowMainnet: true, // ⚠️ Required for mainnet
-  publicKey: process.env.STELLAR_PUBLIC_KEY
+  allowMainnet: true, // Safeguard 1
+  publicKey: process.env.STELLAR_PUBLIC_KEY,
 });
 
-await agent.swap({
-  to: "recipient_address",
-  buyA: true,
-  out: "100",
-  inMax: "110"
-});
-```
-
-**Without the `allowMainnet` flag, you'll receive an error:**
-```
-🚫 Mainnet execution blocked for safety.
-Stellar AgentKit requires explicit opt-in for mainnet operations to prevent accidental use of real funds.
-To enable mainnet, set allowMainnet: true in your config.
-```
-
----
-
-## 🔄 Swap Tokens
-
-Perform token swaps on the Stellar network.
-
-### Testnet Swap
-
-```typescript
-import { AgentClient } from "stellar-agentkit";
-
-const agent = new AgentClient({
-  network: "testnet",
-  publicKey: "YOUR_TESTNET_PUBLIC_KEY"
-});
-
-await agent.swap({
-  to: "recipient_address",
-  buyA: true,
-  out: "100",
-  inMax: "110"
-});
-```
-
-### Mainnet Swap
-
-```typescript
-import { AgentClient } from "stellar-agentkit";
-
-const agent = new AgentClient({
-  network: "mainnet",
-  allowMainnet: true, // Required
-  publicKey: process.env.STELLAR_PUBLIC_KEY
-});
-
-await agent.swap({
-  to: "recipient_address",
-  buyA: true,
-  out: "100",
-  inMax: "110"
-});
-```
-
----
-
-## 🌉 Bridge Tokens
-
-AgentKit supports cross-chain bridging between Stellar and EVM-compatible chains (Ethereum).
-
-### Testnet Bridge (Default)
-
-```typescript
-import { AgentClient } from "stellar-agentkit";
-
-const agent = new AgentClient({
-  network: "testnet",
-  publicKey: "YOUR_TESTNET_PUBLIC_KEY"
-});
-
+// This also requires ALLOW_MAINNET_BRIDGE=true in .env
 await agent.bridge({
-  amount: "100",
-  toAddress: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
+  amount: "50",
+  toAddress: "0x...",
+  assetSymbol: "USDC", // Support for multiple assets
 });
-```
-
-### Mainnet Bridge
-
-⚠️ **Warning:** Bridging on mainnet uses real funds and transactions are **irreversible**.
-
-**Dual-Safeguard System:**
-
-Mainnet bridging requires **BOTH** safeguards to be enabled:
-
-1. **AgentClient Configuration:** `allowMainnet: true`
-2. **Environment Variable:** `ALLOW_MAINNET_BRIDGE=true`
-
-This dual-layer approach prevents accidental mainnet bridging.
-
-**Environment Setup:**
-
-Create a `.env` file with the following:
-
-```bash
-# Required for mainnet bridging
-STELLAR_PUBLIC_KEY=your_mainnet_public_key
-STELLAR_PRIVATE_KEY=your_mainnet_private_key
-ALLOW_MAINNET_BRIDGE=true
-SRB_PROVIDER_URL=https://soroban.stellar.org
-```
-
-**Usage:**
-
-```typescript
-import { AgentClient } from "stellar-agentkit";
-
-const agent = new AgentClient({
-  network: "mainnet",
-  allowMainnet: true, // ⚠️ First safeguard
-  publicKey: process.env.STELLAR_PUBLIC_KEY
-});
-
-// This will also check ALLOW_MAINNET_BRIDGE=true in .env
-await agent.bridge({
-  amount: "100",
-  toAddress: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
-});
-```
-
-**Response Format:**
-
-```typescript
-{
-  status: "confirmed",           // or "pending", "pending_restore", "trustline_submitted"
-  hash: "transaction_hash",
-  network: "stellar-mainnet",    // or "stellar-testnet"
-  asset: "USDC",
-  amount: "100"
-}
-```
-
-**Possible Status Values:**
-
-- `confirmed` - Bridge transaction successful
-- `pending` - Transaction submitted but not yet confirmed
-- `pending_restore` - Restore transaction pending
-- `trustline_submitted` - Trustline setup transaction submitted
-
-**Error Scenarios:**
-
-```typescript
-// Missing allowMainnet flag
-const agent = new AgentClient({
-  network: "mainnet"
-  // allowMainnet: true is missing
-});
-// Throws: "🚫 Mainnet execution blocked for safety..."
-
-// Missing ALLOW_MAINNET_BRIDGE env var
-const agent = new AgentClient({
-  network: "mainnet",
-  allowMainnet: true
-});
-await agent.bridge({ ... });
-// Throws: "Mainnet bridging is disabled. Set ALLOW_MAINNET_BRIDGE=true in your .env file to enable."
-```
-
-**Best Practices:**
-
-- ✅ Always test on testnet first
-- ✅ Start with small amounts on mainnet
-- ✅ Verify destination address multiple times
-- ✅ Keep `ALLOW_MAINNET_BRIDGE` disabled by default in your `.env`
-- ✅ Bridge operations are irreversible - double-check all parameters
-- ✅ Both safeguards must be enabled for mainnet bridging
-
-**Supported Routes:**
-
-- Stellar Testnet → Ethereum (Testnet)
-- Stellar Mainnet → Ethereum (Mainnet) *requires both `allowMainnet: true` and `ALLOW_MAINNET_BRIDGE=true`*
-
----
-
-## 💧 Liquidity Pool Operations
-
-### Deposit Liquidity
-
-```typescript
-await agent.lp.deposit({
-  to: "recipient_address",
-  desiredA: "1000",
-  minA: "950",
-  desiredB: "1000",
-  minB: "950"
-});
-```
-
-### Withdraw Liquidity
-
-```typescript
-await agent.lp.withdraw({
-  to: "recipient_address",
-  shareAmount: "100",
-  minA: "95",
-  minB: "95"
-});
-```
-
-### Query Pool Information
-
-```typescript
-// Get current reserves
-const reserves = await agent.lp.getReserves();
-
-// Get share token ID
-const shareId = await agent.lp.getShareId();
 ```
 
 ---
 
-## 🚨 Error Handling
+## 📊 Comparison: Why AgentKit?
 
-All transaction methods (`swap`, `bridge`, `lp.*`) may throw errors with context. When the SDK uses **AgentKitError**, you get a stable `code`, human-readable `message`, and optional `context` (e.g. `address`, `hash`, `network`). Use `isAgentKitError(e)` to detect and `e.code` to handle specific cases. See `docs/api.md` for the full error code reference.
-
----
-
-## 🪙 Token Issuance (launchToken)
-
-Create a classic Stellar asset: issuer account, trustline, and initial mint. Use `agent.launchToken()` with `assetCode`, `decimals`, `initialSupply`, and issuer/distributor keys. Mainnet issuance requires `allowMainnetTokenIssuance: true` and `ALLOW_MAINNET_TOKEN_ISSUANCE=true` in `.env`. See `docs/api.md` for parameters and error codes (e.g. `missing_trustline`, `invalid_params`).
-
----
-
-## 📚 API Reference
-
-- **Summary:** [docs/api.md](docs/api.md) — AgentClient methods, parameters, returns.
-- **Generated docs:** Run `pnpm run docs:generate` to build TypeDoc output.
+| Feature         |  Standard SDK  |      Stellar AgentKit      |
+| :-------------- | :------------: | :------------------------: |
+| Retry Logic     |   ❌ Manual    | ✅ Automatic (Exponential) |
+| Error Messages  |  ❌ Technical  |     ✅ Human-Readable      |
+| Trustline Setup |   ❌ Manual    |    ✅ One-Click / Auto     |
+| Multi-Chain     | ❌ Native Only |    ✅ Integrated Bridge    |
+| Asset Issuance  |  ❌ Low-Level  |     ✅ Guarded Factory     |
 
 ---
 
-## 🌐 Supported Networks
+## 📚 Documentation
 
-- **Testnet** - Full support, no restrictions, safe for development
-- **Mainnet** - Full support with dual-safeguard system:
-  - **Swaps & LP operations:** Require `allowMainnet: true` in AgentClient config
-  - **Bridge operations:** Require BOTH `allowMainnet: true` AND `ALLOW_MAINNET_BRIDGE=true` in `.env`
-
----
-
-## 🧪 Testing
-
-```bash
-pnpm install
-pnpm run build
-pnpm run test
-```
-
-Set `STELLAR_PUBLIC_KEY` (e.g. a testnet key or any valid-format `G...` address) so the SDK loads; CI sets a dummy value for validation-only tests.
+- [Detailed API Reference](docs/api.md)
+- [Staking Guide](docs/staking.md)
+- [Example: Portfolio Rebalancer](examples/trading_bot.ts)
+- [Example: Multi-Agent Orchestrator](examples/orchestrator.ts)
 
 ---
 
-## 🛡️ Security & Safety
+## 🛡️ Security
 
-### Mainnet Safeguards
-
-AgentKit implements multiple layers of protection against accidental mainnet usage:
-
-1. **AgentClient Level:** Requires explicit `allowMainnet: true` flag
-2. **Bridge Level:** Additional `ALLOW_MAINNET_BRIDGE=true` environment variable check
-3. **Console Warnings:** Clear warnings when mainnet is active
-4. **Error Messages:** Descriptive error messages guide users to correct configuration
-
-### Why Dual Safeguards for Bridge?
-
-Bridging operations are **irreversible** and involve **cross-chain transfers**. The dual-safeguard approach ensures:
-
-- Developers must consciously enable mainnet at both configuration and environment levels
-- Reduces risk of accidental mainnet bridging due to misconfiguration
-- Provides clear separation between general mainnet operations and high-risk bridge operations
+AgentKit implements a **Dual-Safeguard System** for all mainnet operations involving funds. Developers must consciously enable mainnet at both configuration (`AgentClient`) and environment (`.env`) levels.
 
 ---
 
 ## 📄 License
 
-[Add your license here]
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please read our contributing guidelines before submitting PRs.
-
----
-
-## 📞 Support
-
-For issues or questions, please open an issue on GitHub.  
+Stellar AgentKit is open-source software licensed under the **MIT License**.
