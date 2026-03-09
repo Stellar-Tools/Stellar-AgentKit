@@ -50,25 +50,42 @@ const big_js_1 = __importDefault(require("big.js"));
 const bridge_core_sdk_1 = require("@allbridge/bridge-core-sdk");
 const stellar_sdk_1 = require("@stellar/stellar-sdk");
 const utils_1 = require("../utils/utils");
+const buildTransaction_1 = require("../utils/buildTransaction");
 const dotenv = __importStar(require("dotenv"));
 const tools_1 = require("@langchain/core/tools");
 const zod_1 = require("zod");
 dotenv.config({ path: ".env" });
 const fromAddress = process.env.STELLAR_PUBLIC_KEY;
 const privateKey = process.env.STELLAR_PRIVATE_KEY;
-// const toAddress = process.env.ETH_PUBLIC_KEY as string;
+const STELLAR_NETWORK_CONFIG = {
+    "stellar-testnet": {
+        networkPassphrase: stellar_sdk_1.Networks.TESTNET,
+    },
+    "stellar-mainnet": {
+        networkPassphrase: stellar_sdk_1.Networks.PUBLIC,
+    },
+};
 exports.bridgeTokenTool = new tools_1.DynamicStructuredTool({
     name: "bridge_token",
     description: "Bridge token from Stellar chain to EVM compatible chains. Requires amount and toAddress as string",
     schema: zod_1.z.object({
         amount: zod_1.z.string().describe("The amount of tokens to bridge"),
-        toAddress: zod_1.z.string().describe("The destination ETH address (as a string)"),
+        toAddress: zod_1.z.string().describe("The destination address"),
+        fromNetwork: zod_1.z
+            .enum(["stellar-testnet", "stellar-mainnet"])
+            .default("stellar-testnet")
+            .describe("Source Stellar network"),
     }),
-    func: (_a) => __awaiter(void 0, [_a], void 0, function* ({ amount, toAddress }) {
+    func: (_a) => __awaiter(void 0, [_a], void 0, function* ({ amount, toAddress, fromNetwork, }) {
+        // Mainnet safeguard - additional layer beyond AgentClient
+        if (fromNetwork === "stellar-mainnet" &&
+            process.env.ALLOW_MAINNET_BRIDGE !== "true") {
+            throw new Error("Mainnet bridging is disabled. Set ALLOW_MAINNET_BRIDGE=true in your .env file to enable.");
+        }
         const sdk = new bridge_core_sdk_1.AllbridgeCoreSdk(Object.assign(Object.assign({}, bridge_core_sdk_1.nodeRpcUrlsDefault), { SRB: `${process.env.SRB_PROVIDER_URL}` }));
         const chainDetailsMap = yield sdk.chainDetailsMap();
-        const sourceToken = (0, utils_1.ensure)(chainDetailsMap[bridge_core_sdk_1.ChainSymbol.SRB].tokens.find((t) => t.symbol == "USDC"));
-        const destinationToken = (0, utils_1.ensure)(chainDetailsMap[bridge_core_sdk_1.ChainSymbol.ETH].tokens.find((t) => t.symbol == "USDC"));
+        const sourceToken = (0, utils_1.ensure)(chainDetailsMap[bridge_core_sdk_1.ChainSymbol.SRB].tokens.find((t) => t.symbol === "USDC"));
+        const destinationToken = (0, utils_1.ensure)(chainDetailsMap[bridge_core_sdk_1.ChainSymbol.ETH].tokens.find((t) => t.symbol === "USDC"));
         const sendParams = {
             amount,
             fromAccountAddress: fromAddress,
@@ -81,66 +98,77 @@ exports.bridgeTokenTool = new tools_1.DynamicStructuredTool({
             gasFeePaymentMethod: bridge_core_sdk_1.FeePaymentMethod.WITH_STABLECOIN,
         };
         const xdrTx = (yield sdk.bridge.rawTxBuilder.send(sendParams));
-        // SendTx
+        // Use unified transaction builder for XDR-based bridge operations
         const srbKeypair = stellar_sdk_1.Keypair.fromSecret(privateKey);
-        const transaction = stellar_sdk_1.TransactionBuilder.fromXDR(xdrTx, stellar_sdk_1.Networks.TESTNET);
+        const transaction = (0, buildTransaction_1.buildTransactionFromXDR)("bridge", xdrTx, STELLAR_NETWORK_CONFIG[fromNetwork].networkPassphrase);
         transaction.sign(srbKeypair);
         let signedTx = transaction.toXDR();
         const restoreXdrTx = yield sdk.utils.srb.simulateAndCheckRestoreTxRequiredSoroban(signedTx, fromAddress);
         if (restoreXdrTx) {
-            const restoreTx = stellar_sdk_1.TransactionBuilder.fromXDR(restoreXdrTx, stellar_sdk_1.Networks.TESTNET);
+            const restoreTx = (0, buildTransaction_1.buildTransactionFromXDR)("bridge", restoreXdrTx, STELLAR_NETWORK_CONFIG[fromNetwork].networkPassphrase);
             restoreTx.sign(srbKeypair);
             const signedRestoreXdrTx = restoreTx.toXDR();
             const sentRestoreXdrTx = yield sdk.utils.srb.sendTransactionSoroban(signedRestoreXdrTx);
             const confirmRestoreXdrTx = yield sdk.utils.srb.confirmTx(sentRestoreXdrTx.hash);
+            // Handle FAILED restore explicitly
+            if (confirmRestoreXdrTx.status === stellar_sdk_1.rpc.Api.GetTransactionStatus.FAILED) {
+                throw new Error(`Restore transaction failed. Hash: ${sentRestoreXdrTx.hash}`);
+            }
             if (confirmRestoreXdrTx.status === stellar_sdk_1.rpc.Api.GetTransactionStatus.NOT_FOUND) {
-                console.log(`Waited for Restore transaction to complete, but it did not. ` +
-                    `Check the transaction status manually. ` +
-                    `Hash: ${sentRestoreXdrTx.hash}`);
+                return {
+                    status: "pending_restore",
+                    hash: sentRestoreXdrTx.hash,
+                    network: fromNetwork,
+                };
             }
-            else if (confirmRestoreXdrTx.status === stellar_sdk_1.rpc.Api.GetTransactionStatus.FAILED) {
-                console.log(`Transaction Restore failed. Check the transaction manually.` + `Hash: ${sentRestoreXdrTx.hash}`);
-            }
-            else {
-                console.log(`Transaction Restore Confirmed. Hash: ${sentRestoreXdrTx.hash}`);
-            }
-            //get new tx with updated sequences
+            // Get new tx with updated sequences
             const xdrTx2 = (yield sdk.bridge.rawTxBuilder.send(sendParams));
-            const transaction2 = stellar_sdk_1.TransactionBuilder.fromXDR(xdrTx2, stellar_sdk_1.Networks.TESTNET);
+            const transaction2 = (0, buildTransaction_1.buildTransactionFromXDR)("bridge", xdrTx2, STELLAR_NETWORK_CONFIG[fromNetwork].networkPassphrase);
             transaction2.sign(srbKeypair);
             signedTx = transaction2.toXDR();
         }
         const sent = yield sdk.utils.srb.sendTransactionSoroban(signedTx);
         const confirm = yield sdk.utils.srb.confirmTx(sent.hash);
         if (confirm.status === stellar_sdk_1.rpc.Api.GetTransactionStatus.NOT_FOUND) {
-            console.log(`Waited for transaction to complete, but it did not. ` +
-                `Check the transaction status manually. ` +
-                `Hash: ${sent.hash}`);
+            return {
+                status: "pending",
+                hash: sent.hash,
+                network: fromNetwork,
+            };
         }
-        else if (confirm.status === stellar_sdk_1.rpc.Api.GetTransactionStatus.FAILED) {
-            console.log(`Transaction failed. Check the transaction manually.` + `Hash: ${sent.hash}`);
+        if (confirm.status === stellar_sdk_1.rpc.Api.GetTransactionStatus.FAILED) {
+            throw new Error(`Transaction failed. Hash: ${sent.hash}`);
         }
-        else {
-            console.log(`Transaction Confirmed. Hash: ${sent.hash}`);
-        }
-        //TrustLine check and Set up for destinationToken if it is SRB
-        const destinationTokenSBR = sourceToken; // simulate destination is srb
+        // TrustLine check and setup for destinationToken if it is SRB
+        const destinationTokenSBR = sourceToken;
         const balanceLine = yield sdk.utils.srb.getBalanceLine(fromAddress, destinationTokenSBR.tokenAddress);
-        console.log(`BalanceLine:`, balanceLine);
-        const notEnoughBalanceLine = !balanceLine || (0, big_js_1.default)(balanceLine.balance).add(amount).gt((0, big_js_1.default)(balanceLine.limit));
+        const notEnoughBalanceLine = !balanceLine ||
+            (0, big_js_1.default)(balanceLine.balance)
+                .add(amount)
+                .gt((0, big_js_1.default)(balanceLine.limit));
         if (notEnoughBalanceLine) {
             const xdrTx = yield sdk.utils.srb.buildChangeTrustLineXdrTx({
                 sender: fromAddress,
                 tokenAddress: destinationTokenSBR.tokenAddress,
-                // limit: "1000000",
             });
-            //SignTx
+            // Use unified transaction builder for XDR-based bridge TrustLine operation
             const keypair = stellar_sdk_1.Keypair.fromSecret(privateKey);
-            const transaction = stellar_sdk_1.TransactionBuilder.fromXDR(xdrTx, stellar_sdk_1.Networks.TESTNET);
-            transaction.sign(keypair);
-            const signedTrustLineTx = transaction.toXDR();
+            const trustTx = (0, buildTransaction_1.buildTransactionFromXDR)("bridge", xdrTx, STELLAR_NETWORK_CONFIG[fromNetwork].networkPassphrase);
+            trustTx.sign(keypair);
+            const signedTrustLineTx = trustTx.toXDR();
             const submit = yield sdk.utils.srb.submitTransactionStellar(signedTrustLineTx);
-            return `Submitted change trust tx. Hash: ${submit.hash}`;
+            return {
+                status: "trustline_submitted",
+                hash: submit.hash,
+                network: fromNetwork,
+            };
         }
-    })
+        return {
+            status: "confirmed",
+            hash: sent.hash,
+            network: fromNetwork,
+            asset: sourceToken.symbol,
+            amount,
+        };
+    }),
 });

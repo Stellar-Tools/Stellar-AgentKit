@@ -138,6 +138,102 @@ await agent.swap({
 
 ---
 
+## 💰 Asset Management
+
+Manage Stellar assets: retrieve account balances, create custom assets, and manage trustlines for different tokens.
+
+### Get Account Balances
+
+```typescript
+import { assetManagementTool } from "stellartools";
+
+const balances = await assetManagementTool.invoke({
+  action: "get_balances",
+  network: "stellar-testnet"
+});
+// Returns: [{ asset: "XLM", balance: "1000" }, { asset: "USDC", balance: "500", issuer: "..." }]
+```
+
+### Manage Trustlines
+
+Add or remove trustlines to hold custom Stellar assets:
+
+```typescript
+// Add trustline for a custom asset
+const result = await assetManagementTool.invoke({
+  action: "manage_trustline",
+  assetCode: "USDC",
+  assetIssuer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+  operation: "add",
+  limit: "1000000", // Optional, defaults to 1000000
+  network: "stellar-testnet"
+});
+
+// Remove trustline
+await assetManagementTool.invoke({
+  action: "manage_trustline",
+  assetCode: "USDC",
+  assetIssuer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+  operation: "remove",
+  network: "stellar-testnet"
+});
+```
+
+### Create Custom Assets
+
+Issue new custom assets on Stellar. The recipient must have a pre-existing trustline for the asset.
+
+```typescript
+const created = await assetManagementTool.invoke({
+  action: "create_asset",
+  assetCode: "MYTOKEN",              // 1-12 alphanumeric characters
+  recipientAddress: "GBUQWP...",    // Must have trustline for asset
+  amount: "1000",                    // Amount to issue
+  network: "stellar-testnet"
+});
+// Returns: "Asset MYTOKEN issued successfully. Transaction hash: ..."
+```
+
+**Important:** The recipient must add a trustline for your asset **before** you can send it to them.
+
+### Mainnet Asset Management
+
+⚠️ **All mainnet operations require explicit safeguard:**
+
+Create a `.env` file with:
+```bash
+STELLAR_PUBLIC_KEY=your_mainnet_public_key
+STELLAR_PRIVATE_KEY=your_mainnet_private_key
+ALLOW_MAINNET_ASSET_MANAGEMENT=true  # Required for all mainnet asset management operations
+```
+
+```typescript
+await assetManagementTool.invoke({
+  action: "create_asset",
+  assetCode: "MYTOKEN",
+  recipientAddress: "GBUQWP...",
+  amount: "1000",
+  network: "stellar-mainnet"  // Requires ALLOW_MAINNET_ASSET_MANAGEMENT=true
+});
+```
+
+**Error Example (without safeguard):**
+```
+Mainnet asset management is disabled. Set ALLOW_MAINNET_ASSET_MANAGEMENT=true 
+in your .env file to enable.
+```
+
+### Input Validation
+
+Asset management enforces strict validation:
+
+- **assetCode:** 1-12 alphanumeric characters
+- **assetIssuer / recipientAddress:** Valid Stellar public keys (Ed25519)
+- **amount / limit:** Positive numbers with up to 7 decimal places
+- **Keypair consistency:** `STELLAR_PRIVATE_KEY` must derive to matching `STELLAR_PUBLIC_KEY`
+
+---
+
 ## 🌉 Bridge Tokens
 
 AgentKit supports cross-chain bridging between Stellar and EVM-compatible chains (Ethereum).
