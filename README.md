@@ -9,19 +9,20 @@ multiple operations into a single programmable and extensible toolkit.
 
 ---
 
-## ✨ Features
+## Features
 
 - Token swaps on Stellar
 - Cross-chain bridging
 - Liquidity pool (LP) deposits & withdrawals
 - Querying pool reserves and share IDs
+- **Transaction status tracking and monitoring** 
 - Custom contract integrations (current)
 - Designed for future LP provider integrations
 - Supports Testnet & Mainnet
 
 ---
 
-## 🧠 What is AgentKit?
+## What is AgentKit?
 
 AgentKit abstracts complex Stellar operations into a **single agent interface** that can be:
 
@@ -292,12 +293,75 @@ const shareId = await agent.lp.getShareId();
 
 ---
 
-## 🌐 Supported Networks
+## 📊 Transaction Tracking
 
-- **Testnet** - Full support, no restrictions, safe for development
-- **Mainnet** - Full support with dual-safeguard system:
-  - **Swaps & LP operations:** Require `allowMainnet: true` in AgentClient config
-  - **Bridge operations:** Require BOTH `allowMainnet: true` AND `ALLOW_MAINNET_BRIDGE=true` in `.env`
+AgentKit includes a comprehensive transaction tracking system to monitor and manage transaction status across all operations.
+
+### Basic Usage
+
+```typescript
+import { AgentClient, OperationType, TransactionStatus } from "stellartools";
+
+const agent = new AgentClient({
+  network: "testnet",
+  publicKey: process.env.STELLAR_PUBLIC_KEY,
+  enableTracking: true, // Enabled by default
+});
+
+// Perform a swap
+const result = await agent.swap({
+  to: "recipient_address",
+  buyA: true,
+  out: "100",
+  inMax: "110"
+});
+
+// Wait for confirmation
+const status = await agent.waitForConfirmation(result.hash, OperationType.SWAP);
+
+if (status.status === TransactionStatus.SUCCESS) {
+  console.log("✅ Transaction confirmed!");
+  console.log("Ledger:", status.ledger);
+}
+```
+
+### Standalone Tracker
+
+```typescript
+import { createTransactionTracker, OperationType } from "stellartools";
+
+const tracker = createTransactionTracker({
+  network: "testnet",
+  maxRetries: 30,
+  retryInterval: 2000,
+  timeout: 60000,
+});
+
+// Track a transaction
+tracker.trackTransaction("tx_hash", OperationType.BRIDGE);
+
+// Get status
+const status = await tracker.getTransactionStatus("tx_hash");
+```
+
+### Features
+
+- ✅ Real-time transaction monitoring
+- ✅ Automatic retry logic with configurable timeouts
+- ✅ Monitor multiple transactions simultaneously
+- ✅ Filter transactions by operation type
+- ✅ Detailed status information (ledger, timestamps, return values)
+- ✅ Support for all operation types (swap, bridge, LP, payment, stake)
+
+### Transaction Status Types
+
+- `PENDING` - Transaction submitted but not confirmed
+- `SUCCESS` - Transaction confirmed successfully
+- `FAILED` - Transaction failed
+- `NOT_FOUND` - Transaction not found on network
+- `TIMEOUT` - Confirmation timeout reached
+
+**📖 Full Documentation:** See [Transaction Tracking Guide](./docs/TRANSACTION_TRACKING.md) for detailed usage and examples.
 
 ---
 
