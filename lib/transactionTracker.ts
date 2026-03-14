@@ -249,14 +249,15 @@ export class TransactionTracker {
         };
       }
       
-      // Unknown error - return FAILED to avoid masking issues
-      // waitForConfirmation can be called again if needed
+      // Unknown error - return PENDING to allow retries
+      // waitForConfirmation will timeout if error persists
+      // This balances between retrying transient issues and not masking permanent failures
       return {
         hash,
-        status: TransactionStatus.FAILED,
+        status: TransactionStatus.PENDING,
         network: this.network,
         operationType,
-        errorMessage: `RPC error: ${errorMessage}`,
+        errorMessage: `Unknown RPC error (will retry): ${errorMessage}`,
       };
     }
   }
