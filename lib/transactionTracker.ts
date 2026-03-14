@@ -206,33 +206,33 @@ export class TransactionTracker {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       
-      // Check if error is retryable (network/timeout errors)
-      const isRetryable = error instanceof Error && (
-        errorMessage.includes('timeout') ||
-        errorMessage.includes('ECONNREFUSED') ||
-        errorMessage.includes('ENOTFOUND') ||
-        errorMessage.includes('network') ||
-        errorMessage.includes('fetch failed')
+      // Check if error is definitely non-retryable (authentication, invalid hash format, etc.)
+      const isNonRetryable = error instanceof Error && (
+        errorMessage.includes('unauthorized') ||
+        errorMessage.includes('forbidden') ||
+        errorMessage.includes('invalid hash') ||
+        errorMessage.includes('malformed')
       );
       
-      if (isRetryable) {
-        // Treat as transient - return PENDING to allow retries
+      if (isNonRetryable) {
+        // Definitely non-retryable - return FAILED
         return {
           hash,
-          status: TransactionStatus.PENDING,
+          status: TransactionStatus.FAILED,
           network: this.network,
           operationType,
-          errorMessage: `Transient network error: ${errorMessage}`,
+          errorMessage: `Non-retryable error: ${errorMessage}`,
         };
       }
       
-      // Non-retryable error - return FAILED
+      // Default to PENDING for all other errors to allow retries
+      // This is safer as waitForConfirmation will timeout eventually
       return {
         hash,
-        status: TransactionStatus.FAILED,
+        status: TransactionStatus.PENDING,
         network: this.network,
         operationType,
-        errorMessage: `Query failed: ${errorMessage}`,
+        errorMessage: `Transient error (will retry): ${errorMessage}`,
       };
     }
   }

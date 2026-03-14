@@ -47,12 +47,12 @@ bun add stellartools
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Testnet (Safe for Testing)
 
 ```typescript
-import { AgentClient } from "stellar-agentkit";
+import { AgentClient } from "stellartools";
 
 const agent = new AgentClient({
   network: "testnet",
@@ -68,14 +68,14 @@ await agent.swap({
 
 ### Mainnet (Real Funds - Requires Explicit Opt-in)
 
-⚠️ **Safety Notice:** Mainnet operations require the `allowMainnet: true` flag to prevent accidental execution with real funds.
+ **Safety Notice:** Mainnet operations require the `allowMainnet: true` flag to prevent accidental execution with real funds.
 
 ```typescript
-import { AgentClient } from "stellar-agentkit";
+import { AgentClient } from "stellartools";
 
 const agent = new AgentClient({
   network: "mainnet",
-  allowMainnet: true, // ⚠️ Required for mainnet
+  allowMainnet: true, // Required for mainnet
   publicKey: process.env.STELLAR_PUBLIC_KEY
 });
 
@@ -89,21 +89,21 @@ await agent.swap({
 
 **Without the `allowMainnet` flag, you'll receive an error:**
 ```
-🚫 Mainnet execution blocked for safety.
+ Mainnet execution blocked for safety.
 Stellar AgentKit requires explicit opt-in for mainnet operations to prevent accidental use of real funds.
 To enable mainnet, set allowMainnet: true in your config.
 ```
 
 ---
 
-## 🔄 Swap Tokens
+## Swap Tokens
 
 Perform token swaps on the Stellar network.
 
 ### Testnet Swap
 
 ```typescript
-import { AgentClient } from "stellar-agentkit";
+import { AgentClient } from "stellartools";
 
 const agent = new AgentClient({
   network: "testnet",
@@ -121,7 +121,7 @@ await agent.swap({
 ### Mainnet Swap
 
 ```typescript
-import { AgentClient } from "stellar-agentkit";
+import { AgentClient } from "stellartools";
 
 const agent = new AgentClient({
   network: "mainnet",
@@ -139,14 +139,14 @@ await agent.swap({
 
 ---
 
-## 🌉 Bridge Tokens
+## Bridge Tokens
 
 AgentKit supports cross-chain bridging between Stellar and EVM-compatible chains (Ethereum).
 
 ### Testnet Bridge (Default)
 
 ```typescript
-import { AgentClient } from "stellar-agentkit";
+import { AgentClient } from "stellartools";
 
 const agent = new AgentClient({
   network: "testnet",
@@ -161,7 +161,7 @@ await agent.bridge({
 
 ### Mainnet Bridge
 
-⚠️ **Warning:** Bridging on mainnet uses real funds and transactions are **irreversible**.
+ **Warning:** Bridging on mainnet uses real funds and transactions are **irreversible**.
 
 **Dual-Safeguard System:**
 
@@ -187,11 +187,11 @@ SRB_PROVIDER_URL=https://soroban.stellar.org
 **Usage:**
 
 ```typescript
-import { AgentClient } from "stellar-agentkit";
+import { AgentClient } from "stellartools";
 
 const agent = new AgentClient({
   network: "mainnet",
-  allowMainnet: true, // ⚠️ First safeguard
+  allowMainnet: true, // First safeguard
   publicKey: process.env.STELLAR_PUBLIC_KEY
 });
 
