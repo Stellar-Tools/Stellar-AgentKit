@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../../src/transactions/Arguments.ts"],
+  "sourcesContent": ["// Copyright (c) Mysten Labs, Inc.\n// SPDX-License-Identifier: Apache-2.0\n\nimport type { Inputs } from './Inputs.js';\nimport { createObjectMethods } from './object.js';\nimport { createPure } from './pure.js';\nimport type { Transaction, TransactionObjectInput } from './Transaction.js';\n\nexport const Arguments = {\n\tpure: createPure((value) => (tx: Transaction) => tx.pure(value)),\n\tobject: createObjectMethods(\n\t\t(value: TransactionObjectInput) => (tx: Transaction) => tx.object(value),\n\t),\n\tsharedObjectRef:\n\t\t(...args: Parameters<(typeof Inputs)['SharedObjectRef']>) =>\n\t\t(tx: Transaction) =>\n\t\t\ttx.sharedObjectRef(...args),\n\tobjectRef:\n\t\t(...args: Parameters<(typeof Inputs)['ObjectRef']>) =>\n\t\t(tx: Transaction) =>\n\t\t\ttx.objectRef(...args),\n\treceivingRef:\n\t\t(...args: Parameters<(typeof Inputs)['ReceivingRef']>) =>\n\t\t(tx: Transaction) =>\n\t\t\ttx.receivingRef(...args),\n};\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAIA,oBAAoC;AACpC,kBAA2B;AAGpB,MAAM,YAAY;AAAA,EACxB,UAAM,wBAAW,CAAC,UAAU,CAAC,OAAoB,GAAG,KAAK,KAAK,CAAC;AAAA,EAC/D,YAAQ;AAAA,IACP,CAAC,UAAkC,CAAC,OAAoB,GAAG,OAAO,KAAK;AAAA,EACxE;AAAA,EACA,iBACC,IAAI,SACJ,CAAC,OACA,GAAG,gBAAgB,GAAG,IAAI;AAAA,EAC5B,WACC,IAAI,SACJ,CAAC,OACA,GAAG,UAAU,GAAG,IAAI;AAAA,EACtB,cACC,IAAI,SACJ,CAAC,OACA,GAAG,aAAa,GAAG,IAAI;AAC1B;",
+  "names": []
+}
