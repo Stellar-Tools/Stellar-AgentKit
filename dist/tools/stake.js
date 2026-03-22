@@ -13,63 +13,67 @@ exports.StellarContractTool = void 0;
 const tools_1 = require("@langchain/core/tools");
 const zod_1 = require("zod");
 const stakeF_1 = require("../lib/stakeF");
-// Assuming env variables are already loaded elsewhere
 const STELLAR_PUBLIC_KEY = process.env.STELLAR_PUBLIC_KEY;
 if (!STELLAR_PUBLIC_KEY) {
-    throw new Error("Missing Stellar environment variables");
+    throw new Error("Missing STELLAR_PUBLIC_KEY in environment variables");
 }
+const stakingToolSchema = zod_1.z.object({
+    action: zod_1.z.enum([
+        "initialize",
+        "stake",
+        "unstake",
+        "claim_rewards",
+        "get_stake",
+    ]),
+    tokenAddress: zod_1.z.string().optional(),
+    rewardRate: zod_1.z.number().optional(),
+    amount: zod_1.z.number().optional(),
+    userAddress: zod_1.z.string().optional(),
+});
 exports.StellarContractTool = new tools_1.DynamicStructuredTool({
     name: "stellar_contract_tool",
     description: "Interact with a staking contract on Stellar Soroban: initialize, stake, unstake, claim rewards, or get stake.",
-    schema: zod_1.z.object({
-        action: zod_1.z.enum(["initialize", "stake", "unstake", "claim_rewards", "get_stake"]),
-        tokenAddress: zod_1.z.string().optional(), // Only for initialize
-        rewardRate: zod_1.z.number().optional(), // Only for initialize
-        amount: zod_1.z.number().optional(), // For stake/unstake
-        userAddress: zod_1.z.string().optional(), // For get_stake
-    }),
-    func: (_a) => __awaiter(void 0, [_a], void 0, function* ({ action, tokenAddress, rewardRate, amount, userAddress }) {
+    schema: stakingToolSchema,
+    func: (_a) => __awaiter(void 0, [_a], void 0, function* ({ action, tokenAddress, rewardRate, amount, userAddress, }) {
         try {
             switch (action) {
                 case "initialize": {
                     if (!tokenAddress || rewardRate === undefined) {
-                        throw new Error("tokenAddress and rewardRate are required for initialize");
+                        throw new Error("initialize requires: tokenAddress and rewardRate");
                     }
-                    const result = yield (0, stakeF_1.initialize)(STELLAR_PUBLIC_KEY, tokenAddress, rewardRate);
-                    return result !== null && result !== void 0 ? result : "Contract initialized successfully.";
+                    yield (0, stakeF_1.initialize)(STELLAR_PUBLIC_KEY, tokenAddress, rewardRate);
+                    return "Contract initialized successfully.";
                 }
                 case "stake": {
                     if (amount === undefined) {
-                        throw new Error("amount is required for stake");
+                        throw new Error("stake requires: amount");
                     }
-                    const result = yield (0, stakeF_1.stake)(STELLAR_PUBLIC_KEY, amount);
-                    return result !== null && result !== void 0 ? result : `Staked ${amount} successfully.`;
+                    yield (0, stakeF_1.stake)(STELLAR_PUBLIC_KEY, amount);
+                    return `Staked ${amount} successfully.`;
                 }
                 case "unstake": {
                     if (amount === undefined) {
-                        throw new Error("amount is required for unstake");
+                        throw new Error("unstake requires: amount");
                     }
-                    const result = yield (0, stakeF_1.unstake)(STELLAR_PUBLIC_KEY, amount);
-                    return result !== null && result !== void 0 ? result : `Unstaked ${amount} successfully.`;
+                    yield (0, stakeF_1.unstake)(STELLAR_PUBLIC_KEY, amount);
+                    return `Unstaked ${amount} successfully.`;
                 }
                 case "claim_rewards": {
-                    const result = yield (0, stakeF_1.claimRewards)(STELLAR_PUBLIC_KEY);
-                    return result !== null && result !== void 0 ? result : "Rewards claimed successfully.";
+                    yield (0, stakeF_1.claimRewards)(STELLAR_PUBLIC_KEY);
+                    return "Rewards claimed successfully.";
                 }
                 case "get_stake": {
                     if (!userAddress) {
-                        throw new Error("userAddress is required for get_stake");
+                        throw new Error("get_stake requires: userAddress");
                     }
                     const stakeAmount = yield (0, stakeF_1.getStake)(STELLAR_PUBLIC_KEY, userAddress);
                     return `Stake for ${userAddress}: ${stakeAmount}`;
                 }
-                default:
-                    throw new Error("Unsupported action");
             }
         }
         catch (error) {
-            console.error("StellarContractTool error:", error.message);
-            throw new Error(`Failed to execute ${action}: ${error.message}`);
+            const message = error instanceof Error ? error.message : "Unknown error";
+            throw new Error(`[stellar_contract_tool] Failed to execute ${action}: ${message}`);
         }
     }),
 });
