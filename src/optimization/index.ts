@@ -188,6 +188,18 @@ export class SorobanCaches {
   }
 
   /**
+   * Stop all background cleanup timers.
+   * Useful for tests and process shutdown to avoid leaking intervals.
+   */
+  stopAutoCleanup(): void {
+    this.poolResources.stopAutoCleanup();
+    this.shareIds.stopAutoCleanup();
+    this.accountSequences.stopAutoCleanup();
+    this.networkState.stopAutoCleanup();
+    this.swapQuotes.stopAutoCleanup();
+  }
+
+  /**
    * Get cache stats
    */
   getStats(): {
@@ -244,6 +256,10 @@ export class PriceCalculator {
     const numerator = amountInWithFee.times(reserveOutBig);
     const denominator = reserveInBig.plus(amountInWithFee);
 
+    if (denominator.lte(0)) {
+      throw new Error("Invalid swap parameters: denominator must be greater than zero");
+    }
+
     return numerator.div(denominator).toString();
   }
 
@@ -265,6 +281,10 @@ export class PriceCalculator {
     const numerator = reserveInBig.times(output);
     const denominator = reserveOutBig.minus(output).times(fee);
 
+    if (denominator.lte(0)) {
+      throw new Error("Invalid swap parameters: denominator must be greater than zero");
+    }
+
     return numerator.div(denominator).toString();
   }
 
@@ -281,6 +301,10 @@ export class PriceCalculator {
     const total = new Big(totalShares);
     const resA = new Big(reserveA);
     const resB = new Big(reserveB);
+
+    if (total.lte(0)) {
+      throw new Error("totalShares must be greater than zero");
+    }
 
     const proportion = shares.div(total);
 
@@ -299,6 +323,10 @@ export class PriceCalculator {
   ): { slippageAmount: string; slippagePercent: string } {
     const expected = new Big(expectedAmount);
     const actual = new Big(actualAmount);
+
+    if (expected.eq(0)) {
+      throw new Error("expectedAmount must be greater than zero");
+    }
 
     const slippageAmount = expected.minus(actual);
     const slippagePercent = slippageAmount.div(expected).times(100);

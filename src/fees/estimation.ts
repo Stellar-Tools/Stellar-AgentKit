@@ -5,9 +5,21 @@
  * Critical for DeFi UX - users need to know costs upfront.
  */
 
-import { rpc, BASE_FEE, TransactionBuilder, Account } from "@stellar/stellar-sdk";
+import { rpc, BASE_FEE } from "@stellar/stellar-sdk";
 import Big from "big.js";
 import { NetworkError, ContractError } from "../errors";
+
+function toBigOrZero(value: unknown): Big {
+  if (value === undefined || value === null) {
+    return new Big(0);
+  }
+
+  try {
+    return new Big(String(value));
+  } catch {
+    return new Big(0);
+  }
+}
 
 export interface FeeEstimate {
   baseFee: string;           // Base fee in stroops
@@ -43,6 +55,14 @@ export async function estimateSorobanFee(
     feeMultiplier = 1.5, // 50% buffer by default
   } = options;
 
+  if (!Number.isFinite(feeMultiplier) || feeMultiplier <= 0) {
+    throw new ContractError(
+      `Invalid feeMultiplier: ${feeMultiplier}`,
+      { feeMultiplier },
+      "feeMultiplier must be a finite positive number"
+    );
+  }
+
   try {
     const server = new rpc.Server(rpcUrl, { allowHttp: true });
 
@@ -69,37 +89,29 @@ export async function estimateSorobanFee(
     }
 
     const result = (simulation as any).results[0];
-    const simLatestLedger = (simulation as any).latestLedger || 0;
 
-    // Extract resource costs from simulation
-    let cpuCost = "0";
-    let memCost = "0";
-    let bandwidthCost = "0";
+    // Soroban RPC v13+ exposes fees at top-level fields (e.g. minResourceFee).
+    const minResourceFee = toBigOrZero((simulation as any).minResourceFee);
+    const transactionDataResourceFee = toBigOrZero((simulation as any).transactionData?.resourceFee);
+    const resourceFeeAmount = minResourceFee.gt(0) ? minResourceFee : transactionDataResourceFee;
 
-    if ("resourceFee" in result) {
-      // Parse resource fees if available
-      const resourceFee = result.resourceFee || {};
-      cpuCost = String(resourceFee.cpuInsn || 0);
-      memCost = String(resourceFee.memBytes || 0);
-      bandwidthCost = String(resourceFee.bandBytes || 0);
-    }
+    // Keep a lightweight resource breakdown for compatibility.
+    const cpuCost = includeResourceBreakdown ? String((simulation as any).cpuInstructions || 0) : "0";
+    const memCost = includeResourceBreakdown ? String((simulation as any).memoryBytes || 0) : "0";
+    const bandwidthCost = includeResourceBreakdown ? String((simulation as any).readWriteBytes || 0) : "0";
 
     // Calculate fee components
     const baseFeeAmount = new Big(BASE_FEE);
-    const resourceFeeAmount = new Big(cpuCost)
-      .plus(memCost)
-      .plus(bandwidthCost)
-      .times(0.00001); // Convert to stroops
+    const networkFeeAmount = baseFeeAmount.plus(resourceFeeAmount);
 
     // Apply safety multiplier for conservative estimate
-    const totalFeeAmount = baseFeeAmount
-      .plus(resourceFeeAmount)
+    const totalFeeAmount = networkFeeAmount
       .times(feeMultiplier)
       .round(0, 3); // Round up
 
     return {
       baseFee: baseFeeAmount.toString(),
-      networkFee: baseFeeAmount.toString(),
+      networkFee: networkFeeAmount.toString(),
       simulationFee: resourceFeeAmount.toString(),
       totalFee: totalFeeAmount.toString(),
       resourceFees: {
@@ -164,19 +176,18 @@ export function estimateDepositFee(
   desiredAmountA: string,
   desiredAmountB: string
 ): FeeEstimate {
-  const totalAmount = new Big(desiredAmountA).plus(desiredAmountB);
+  // Parse amounts to fail fast on invalid numeric inputs.
+  new Big(desiredAmountA);
+  new Big(desiredAmountB);
 
-  // LP operations typically cost more due to reserve checks
-  const depositFee = totalAmount.times(0.0005); // 0.05% deposit fee
+  // LP operations typically consume more network resources than swaps.
   const networkFee = new Big(BASE_FEE).times(3); // Higher cost for LP
-
-  const totalFee = depositFee.plus(networkFee);
 
   return {
     baseFee: BASE_FEE.toString(),
     networkFee: networkFee.toString(),
-    simulationFee: depositFee.toString(),
-    totalFee: totalFee.toString(),
+    simulationFee: "0",
+    totalFee: networkFee.toString(),
     resourceFees: {
       cpu: "8000000",
       memory: "200000",
@@ -189,18 +200,16 @@ export function estimateDepositFee(
  * Estimates LP withdrawal fee
  */
 export function estimateWithdrawalFee(shareAmount: string): FeeEstimate {
-  const amount = new Big(shareAmount);
+  // Parse amount to fail fast on invalid numeric input.
+  new Big(shareAmount);
 
-  const withdrawalFee = amount.times(0.0005); // 0.05% withdrawal fee
   const networkFee = new Big(BASE_FEE).times(2.8); // ~2.8x for withdrawal
-
-  const totalFee = withdrawalFee.plus(networkFee);
 
   return {
     baseFee: BASE_FEE.toString(),
     networkFee: networkFee.toString(),
-    simulationFee: withdrawalFee.toString(),
-    totalFee: totalFee.toString(),
+    simulationFee: "0",
+    totalFee: networkFee.toString(),
     resourceFees: {
       cpu: "7000000",
       memory: "150000",
@@ -228,7 +237,7 @@ export function calculateOperationCost(
   const totalFee = new Big(fee.totalFee);
 
   const slippage = input.minus(estimated);
-  const slippagePercent = slippage.div(input).times(100);
+  const slippagePercent = input.eq(0) ? new Big(0) : slippage.div(input).times(100);
 
   return {
     inputAmount: input.toString(),

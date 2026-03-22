@@ -50,6 +50,9 @@ class EventMonitor extends events_1.EventEmitter {
         this.history = new Map();
         this.cleanupInterval = null;
         this.eventIdCounter = 0;
+        if (!Number.isFinite(maxHistorySize) || !Number.isInteger(maxHistorySize) || maxHistorySize <= 0) {
+            throw new Error(`maxHistorySize must be a positive integer, got ${maxHistorySize}`);
+        }
         this.maxHistorySize = maxHistorySize;
     }
     /**

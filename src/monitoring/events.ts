@@ -101,6 +101,9 @@ export class EventMonitor extends EventEmitter {
 
   constructor(maxHistorySize: number = 10000) {
     super();
+    if (!Number.isFinite(maxHistorySize) || !Number.isInteger(maxHistorySize) || maxHistorySize <= 0) {
+      throw new Error(`maxHistorySize must be a positive integer, got ${maxHistorySize}`);
+    }
     this.maxHistorySize = maxHistorySize;
   }
 

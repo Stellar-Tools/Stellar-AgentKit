@@ -32,6 +32,7 @@ class AgentClient {
                 "Real funds will be used. Double-check all parameters before proceeding.\n");
         }
         this.publicKey = config.publicKey || process.env.STELLAR_PUBLIC_KEY || "";
+        this.rpcUrl = config.rpcUrl;
         this.validateInput = config.validateInput !== false;
         // Auto-retry for reads is safe (idempotent)
         // Auto-retry for writes requires explicit opt-in (dangerous if not idempotent)
@@ -59,7 +60,10 @@ class AgentClient {
         if (this.network === "mainnet" && process.env.ALLOW_MAINNET_BRIDGE !== "true") {
             throw new errors_1.OperationNotAllowedError("bridge", "Mainnet bridging requires additional security approval", {}, "Set ALLOW_MAINNET_BRIDGE=true in your .env file");
         }
-        return await this.executeWriteWithRetry(() => bridge_1.bridgeTokenTool.func(params));
+        return await this.executeWriteWithRetry(() => bridge_1.bridgeTokenTool.func({
+            ...params,
+            ...(this.rpcUrl ? { rpcUrl: this.rpcUrl } : {}),
+        }));
     }
     /**
      * Liquidity pool operations
@@ -122,6 +126,12 @@ class AgentClient {
      */
     getNetwork() {
         return this.network;
+    }
+    /**
+     * Get configured RPC URL, if any
+     */
+    getRpcUrl() {
+        return this.rpcUrl;
     }
     /**
      * Get public key

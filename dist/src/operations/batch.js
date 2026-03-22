@@ -14,6 +14,18 @@ exports.simulateBatchTransaction = simulateBatchTransaction;
 exports.createBatchBuilder = createBatchBuilder;
 const stellar_sdk_1 = require("@stellar/stellar-sdk");
 const errors_1 = require("../errors");
+function getDefaultRpcUrl(networkPassphrase) {
+    return networkPassphrase === stellar_sdk_1.Networks.PUBLIC
+        ? "https://mainnet.sorobanrpc.com"
+        : "https://soroban-testnet.stellar.org";
+}
+function parsePositiveMultiplier(value, fallback) {
+    const resolved = value ?? fallback;
+    if (!Number.isFinite(resolved) || resolved <= 0) {
+        throw new errors_1.ValidationError(`Invalid feeMultiplier: ${resolved}`, { feeMultiplier: resolved }, "feeMultiplier must be a finite positive number");
+    }
+    return resolved;
+}
 /**
  * Batch transaction builder
  *
@@ -25,12 +37,13 @@ class BatchTransactionBuilder {
         this.operations = [];
         this.maxOperations = 20; // Soroban limit
         this.sourceAccount = sourceAccount;
+        const networkPassphrase = options.networkPassphrase || stellar_sdk_1.Networks.TESTNET;
         this.options = {
-            rpcUrl: options.rpcUrl || "https://soroban-testnet.stellar.org",
-            networkPassphrase: options.networkPassphrase || stellar_sdk_1.Networks.TESTNET,
+            rpcUrl: options.rpcUrl || getDefaultRpcUrl(networkPassphrase),
+            networkPassphrase,
             timeout: options.timeout || 300,
             memo: options.memo || "",
-            feeMultiplier: options.feeMultiplier || 1.2, // 20% extra for batch
+            feeMultiplier: parsePositiveMultiplier(options.feeMultiplier, 1.2), // 20% extra for batch
         };
     }
     /**
@@ -116,8 +129,9 @@ exports.BatchTransactionBuilder = BatchTransactionBuilder;
  * Execute and monitor batch transaction
  */
 async function executeBatchTransaction(transaction, privateKey, options = {}) {
-    const rpcUrl = options.rpcUrl || "https://soroban-testnet.stellar.org";
     const networkPassphrase = options.networkPassphrase || stellar_sdk_1.Networks.TESTNET;
+    const rpcUrl = options.rpcUrl || getDefaultRpcUrl(networkPassphrase);
+    const timeoutSeconds = options.timeout ?? 300;
     try {
         const server = new stellar_sdk_1.rpc.Server(rpcUrl, { allowHttp: true });
         // Sign transaction
@@ -137,11 +151,27 @@ async function executeBatchTransaction(transaction, privateKey, options = {}) {
         if (!("hash" in response)) {
             throw new errors_1.TransactionError("Invalid transaction submission response", { response: JSON.stringify(response) });
         }
+        if (response.status === "ERROR") {
+            throw new errors_1.TransactionError("Transaction submission failed", { response: JSON.stringify(response), rpcUrl });
+        }
+        // Confirm final transaction outcome from RPC instead of assuming success on submission.
+        let finalTx = null;
+        const deadline = Date.now() + timeoutSeconds * 1000;
+        while (Date.now() < deadline) {
+            finalTx = await server.getTransaction(response.hash);
+            if (finalTx && (finalTx.status === "SUCCESS" || finalTx.status === "FAILED")) {
+                break;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+        }
+        if (!finalTx || finalTx.status !== "SUCCESS") {
+            throw new errors_1.TransactionError("Batch transaction was submitted but not confirmed successfully", { hash: response.hash, finalStatus: finalTx?.status, rpcUrl });
+        }
         // Parse transaction results
         const operations = transaction.operations?.length || 0;
         return {
             transactionHash: response.hash,
-            ledger: response.ledger || 0,
+            ledger: Number(finalTx.ledger) || Number(response.ledger) || 0,
             operations,
             status: "success",
             results: Array(operations)
@@ -161,15 +191,29 @@ async function executeBatchTransaction(transaction, privateKey, options = {}) {
  * Simulate batch transaction to estimate fees
  */
 async function simulateBatchTransaction(transaction, options = {}) {
-    const rpcUrl = options.rpcUrl || "https://soroban-testnet.stellar.org";
+    const networkPassphrase = options.networkPassphrase || stellar_sdk_1.Networks.TESTNET;
+    const rpcUrl = options.rpcUrl || getDefaultRpcUrl(networkPassphrase);
     try {
         const server = new stellar_sdk_1.rpc.Server(rpcUrl, { allowHttp: true });
         const simulation = await server.simulateTransaction(transaction);
         if ("error" in simulation) {
             throw new errors_1.ContractError(`Batch simulation failed: ${simulation.error}`, { rpcUrl });
         }
+        const txFee = BigInt(transaction.fee || stellar_sdk_1.BASE_FEE);
+        const resourceFee = (() => {
+            const minResourceFee = simulation.minResourceFee;
+            if (minResourceFee === undefined || minResourceFee === null) {
+                return 0n;
+            }
+            try {
+                return BigInt(String(minResourceFee));
+            }
+            catch {
+                return 0n;
+            }
+        })();
         return {
-            estimatedFee: (BigInt(transaction.fee || stellar_sdk_1.BASE_FEE) * BigInt(1000000000)).toString(),
+            estimatedFee: (txFee + resourceFee).toString(),
             resourceUsage: simulation.results?.[0] || {},
             success: true,
         };

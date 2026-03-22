@@ -34,7 +34,7 @@ const eventId = monitor.recordEvent(
 // Track progress
 monitor.updateStatus(eventId, EventStatus.VALIDATING);
 monitor.updateStatus(eventId, EventStatus.SIMULATING);
-monitor.updateStatus(eventId, EventStatus.SIGNED);
+monitor.updateStatus(eventId, EventStatus.SIGNING);
 monitor.setTransactionHash(eventId, 'abc123...', 12345);
 
 // Query history
@@ -121,6 +121,11 @@ console.log(impact.spotPrice);       // 0.5000 (no impact)
 console.log(impact.executionPrice);  // 0.4975 (actual price)
 
 // Validate user's tolerance
+const amountIn = '10000';
+const expectedOutput = '4975.12';
+const minAmountOut = '4900';
+const maxAllowedSlippage = 1.0;
+
 const validation = validateSlippage(
   amountIn,         // '10000'
   expectedOutput,   // '4975.12'
@@ -325,7 +330,7 @@ createTransactionHash('zzzz')        // ❌ Invalid hex
 - Can't accidentally use user key as contract address
 
 ✅ **Slippage Protection**
-- Prevents sandwich attacks via pre-execution validation
+- Performs pre-execution slippage and price-impact checks
 - Warns about low-liquidity trades
 - Detects extreme price movements
 

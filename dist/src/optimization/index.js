@@ -152,6 +152,17 @@ class SorobanCaches {
         this.swapQuotes.clear();
     }
     /**
+     * Stop all background cleanup timers.
+     * Useful for tests and process shutdown to avoid leaking intervals.
+     */
+    stopAutoCleanup() {
+        this.poolResources.stopAutoCleanup();
+        this.shareIds.stopAutoCleanup();
+        this.accountSequences.stopAutoCleanup();
+        this.networkState.stopAutoCleanup();
+        this.swapQuotes.stopAutoCleanup();
+    }
+    /**
      * Get cache stats
      */
     getStats() {
@@ -193,6 +204,9 @@ class PriceCalculator {
         const amountInWithFee = input.times(fee);
         const numerator = amountInWithFee.times(reserveOutBig);
         const denominator = reserveInBig.plus(amountInWithFee);
+        if (denominator.lte(0)) {
+            throw new Error("Invalid swap parameters: denominator must be greater than zero");
+        }
         return numerator.div(denominator).toString();
     }
     /**
@@ -206,6 +220,9 @@ class PriceCalculator {
         // (reserveIn * output) / ((reserveOut - output) * fee)
         const numerator = reserveInBig.times(output);
         const denominator = reserveOutBig.minus(output).times(fee);
+        if (denominator.lte(0)) {
+            throw new Error("Invalid swap parameters: denominator must be greater than zero");
+        }
         return numerator.div(denominator).toString();
     }
     /**
@@ -216,6 +233,9 @@ class PriceCalculator {
         const total = new big_js_1.default(totalShares);
         const resA = new big_js_1.default(reserveA);
         const resB = new big_js_1.default(reserveB);
+        if (total.lte(0)) {
+            throw new Error("totalShares must be greater than zero");
+        }
         const proportion = shares.div(total);
         return {
             valueA: resA.times(proportion).toString(),
@@ -228,6 +248,9 @@ class PriceCalculator {
     calculateSlippage(expectedAmount, actualAmount) {
         const expected = new big_js_1.default(expectedAmount);
         const actual = new big_js_1.default(actualAmount);
+        if (expected.eq(0)) {
+            throw new Error("expectedAmount must be greater than zero");
+        }
         const slippageAmount = expected.minus(actual);
         const slippagePercent = slippageAmount.div(expected).times(100);
         return {

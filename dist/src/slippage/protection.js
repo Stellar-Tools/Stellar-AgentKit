@@ -33,8 +33,12 @@ function calculateSwapOutput(options) {
     const fee = new big_js_1.default(1 - feePercent / 100);
     // Input amount after fee
     const amountInWithFee = inAmount.times(fee);
+    const denominator = rIn.plus(amountInWithFee);
+    if (denominator.lte(0)) {
+        throw new Error('Invalid pool state: swap denominator must be greater than zero');
+    }
     // Output = (amountInWithFee * rOut) / (rIn + amountInWithFee)
-    const output = amountInWithFee.times(rOut).div(rIn.plus(amountInWithFee));
+    const output = amountInWithFee.times(rOut).div(denominator);
     return output.toFixed(7);
 }
 /**
@@ -45,6 +49,12 @@ function calculatePriceImpact(options) {
     const inAmount = new big_js_1.default(amountIn);
     const rIn = new big_js_1.default(reserveIn);
     const rOut = new big_js_1.default(reserveOut);
+    if (rIn.lte(0)) {
+        throw new Error('Invalid pool state: reserveIn must be greater than zero');
+    }
+    if (inAmount.lte(0)) {
+        throw new Error('amountIn must be greater than zero');
+    }
     // Spot price (no input)
     const spotPrice = rOut.div(rIn);
     // Execution price (with input)
@@ -78,7 +88,15 @@ function validateSlippage(amountIn, expectedAmountOut, minAmountOut, maxAllowedS
 ) {
     const expected = new big_js_1.default(expectedAmountOut);
     const minimum = new big_js_1.default(minAmountOut);
-    const actual = new big_js_1.default(amountIn);
+    if (expected.lte(0)) {
+        throw new Error('expectedAmountOut must be greater than zero');
+    }
+    if (!Number.isFinite(maxAllowedSlippage) || maxAllowedSlippage <= 0) {
+        throw new Error(`maxAllowedSlippage must be a finite positive number, got ${maxAllowedSlippage}`);
+    }
+    if (new big_js_1.default(amountIn).lt(0)) {
+        throw new Error('amountIn cannot be negative');
+    }
     // Calculate actual slippage
     const slippage = expected.minus(minimum).div(expected).times(100);
     const slippagePercent = parseFloat(slippage.toFixed(2));
@@ -136,6 +154,9 @@ function createSlippageMonitor(initialPrice, maxSlippage) {
  */
 function updatePriceMonitor(monitor, currentPrice) {
     const current = new big_js_1.default(currentPrice);
+    if (monitor.initialPrice.eq(0)) {
+        throw new Error('initialPrice must be greater than zero');
+    }
     const deviation = monitor.initialPrice.minus(current)
         .div(monitor.initialPrice)
         .times(100);
@@ -180,6 +201,9 @@ function analyzeTradesafety(priceImpact, slippageValidation, liquidity // Total 
     // Check trade size vs liquidity
     const tradeSize = new big_js_1.default(priceImpact.amountIn);
     const liquidityBig = new big_js_1.default(liquidity);
+    if (liquidityBig.lte(0)) {
+        throw new Error('liquidity must be greater than zero');
+    }
     const tradeSizePercent = tradeSize.div(liquidityBig).times(100);
     if (tradeSizePercent.gt(10)) {
         warnings.push(`Large trade: ${tradeSizePercent.toFixed(2)}% of pool liquidity`);

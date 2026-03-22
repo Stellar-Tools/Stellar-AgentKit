@@ -151,7 +151,7 @@ function validateAmount(amount, options = {}) {
         });
     }
     // Check maximum
-    if (maxAmount && bigAmount.gt(maxAmount)) {
+    if (maxAmount !== undefined && bigAmount.gt(maxAmount)) {
         throw new errors_1.InvalidAmountError(amount, {
             value: bigAmount.toString(),
             maxAmount: String(maxAmount),
@@ -202,12 +202,19 @@ function validateRequired(value, paramName, operation) {
     }
     return value;
 }
+function validateParamsObject(params, operation) {
+    if (params === null || params === undefined || typeof params !== 'object' || Array.isArray(params)) {
+        throw new errors_1.ValidationError(`Invalid ${operation} parameters: expected object`, { receivedType: params === null ? 'null' : typeof params }, 'Provide a non-null object with required parameters');
+    }
+    return params;
+}
 function validateSwapParams(params) {
+    const safeParams = validateParamsObject(params, 'swap');
     const validated = {
-        to: validateStellarAddress(validateRequired(params.to, 'to', 'swap')),
-        buyA: validateRequired(params.buyA, 'buyA', 'swap'),
-        out: validateAmount(validateRequired(params.out, 'out', 'swap'), { minAmount: 0 }),
-        inMax: validateAmount(validateRequired(params.inMax, 'inMax', 'swap'), { minAmount: 0 }),
+        to: validateStellarAddress(validateRequired(safeParams.to, 'to', 'swap')),
+        buyA: validateRequired(safeParams.buyA, 'buyA', 'swap'),
+        out: validateAmount(validateRequired(safeParams.out, 'out', 'swap'), { minAmount: 0 }),
+        inMax: validateAmount(validateRequired(safeParams.inMax, 'inMax', 'swap'), { minAmount: 0 }),
     };
     // Validate logical constraints
     if (typeof validated.buyA !== 'boolean') {
@@ -224,12 +231,13 @@ function validateSwapParams(params) {
     return validated;
 }
 function validateDepositParams(params) {
+    const safeParams = validateParamsObject(params, 'deposit');
     const validated = {
-        to: validateStellarAddress(validateRequired(params.to, 'to', 'deposit')),
-        desiredA: validateAmount(validateRequired(params.desiredA, 'desiredA', 'deposit')),
-        minA: validateAmount(validateRequired(params.minA, 'minA', 'deposit')),
-        desiredB: validateAmount(validateRequired(params.desiredB, 'desiredB', 'deposit')),
-        minB: validateAmount(validateRequired(params.minB, 'minB', 'deposit')),
+        to: validateStellarAddress(validateRequired(safeParams.to, 'to', 'deposit')),
+        desiredA: validateAmount(validateRequired(safeParams.desiredA, 'desiredA', 'deposit')),
+        minA: validateAmount(validateRequired(safeParams.minA, 'minA', 'deposit')),
+        desiredB: validateAmount(validateRequired(safeParams.desiredB, 'desiredB', 'deposit')),
+        minB: validateAmount(validateRequired(safeParams.minB, 'minB', 'deposit')),
     };
     // Validate logical constraints
     const desiredA = new big_js_1.default(validated.desiredA);
@@ -245,21 +253,23 @@ function validateDepositParams(params) {
     return validated;
 }
 function validateWithdrawParams(params) {
+    const safeParams = validateParamsObject(params, 'withdraw');
     return {
-        to: validateStellarAddress(validateRequired(params.to, 'to', 'withdraw')),
-        shareAmount: validateAmount(validateRequired(params.shareAmount, 'shareAmount', 'withdraw')),
-        minA: validateAmount(validateRequired(params.minA, 'minA', 'withdraw')),
-        minB: validateAmount(validateRequired(params.minB, 'minB', 'withdraw')),
+        to: validateStellarAddress(validateRequired(safeParams.to, 'to', 'withdraw')),
+        shareAmount: validateAmount(validateRequired(safeParams.shareAmount, 'shareAmount', 'withdraw')),
+        minA: validateAmount(validateRequired(safeParams.minA, 'minA', 'withdraw')),
+        minB: validateAmount(validateRequired(safeParams.minB, 'minB', 'withdraw')),
     };
 }
 function validateBridgeParams(params) {
-    const fromNetwork = params.fromNetwork || 'stellar-testnet';
+    const safeParams = validateParamsObject(params, 'bridge');
+    const fromNetwork = safeParams.fromNetwork || 'stellar-testnet';
     if (fromNetwork !== 'stellar-testnet' && fromNetwork !== 'stellar-mainnet') {
         throw new errors_1.ValidationError('Invalid fromNetwork value', { received: fromNetwork, allowed: ['stellar-testnet', 'stellar-mainnet'] });
     }
     return {
-        amount: validateAmount(validateRequired(params.amount, 'amount', 'bridge')),
-        toAddress: validateRequired(params.toAddress, 'toAddress', 'bridge'),
+        amount: validateAmount(validateRequired(safeParams.amount, 'amount', 'bridge')),
+        toAddress: validateRequired(safeParams.toAddress, 'toAddress', 'bridge'),
         fromNetwork: fromNetwork,
     };
 }

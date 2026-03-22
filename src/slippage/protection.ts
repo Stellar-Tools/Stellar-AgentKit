@@ -72,9 +72,14 @@ export function calculateSwapOutput(options: PriceCalculationOptions): string {
 
   // Input amount after fee
   const amountInWithFee = inAmount.times(fee);
+  const denominator = rIn.plus(amountInWithFee);
+
+  if (denominator.lte(0)) {
+    throw new Error('Invalid pool state: swap denominator must be greater than zero');
+  }
 
   // Output = (amountInWithFee * rOut) / (rIn + amountInWithFee)
-  const output = amountInWithFee.times(rOut).div(rIn.plus(amountInWithFee));
+  const output = amountInWithFee.times(rOut).div(denominator);
 
   return output.toFixed(7);
 }
@@ -88,6 +93,13 @@ export function calculatePriceImpact(options: PriceCalculationOptions): PriceImp
   const inAmount = new Big(amountIn);
   const rIn = new Big(reserveIn);
   const rOut = new Big(reserveOut);
+
+  if (rIn.lte(0)) {
+    throw new Error('Invalid pool state: reserveIn must be greater than zero');
+  }
+  if (inAmount.lte(0)) {
+    throw new Error('amountIn must be greater than zero');
+  }
 
   // Spot price (no input)
   const spotPrice = rOut.div(rIn);
@@ -128,7 +140,16 @@ export function validateSlippage(
 ): SlippageValidation {
   const expected = new Big(expectedAmountOut);
   const minimum = new Big(minAmountOut);
-  const actual = new Big(amountIn);
+
+  if (expected.lte(0)) {
+    throw new Error('expectedAmountOut must be greater than zero');
+  }
+  if (!Number.isFinite(maxAllowedSlippage) || maxAllowedSlippage <= 0) {
+    throw new Error(`maxAllowedSlippage must be a finite positive number, got ${maxAllowedSlippage}`);
+  }
+  if (new Big(amountIn).lt(0)) {
+    throw new Error('amountIn cannot be negative');
+  }
 
   // Calculate actual slippage
   const slippage = expected.minus(minimum).div(expected).times(100);
@@ -198,6 +219,11 @@ export function updatePriceMonitor(
   currentPrice: string
 ): SlippageMonitor {
   const current = new Big(currentPrice);
+
+  if (monitor.initialPrice.eq(0)) {
+    throw new Error('initialPrice must be greater than zero');
+  }
+
   const deviation = monitor.initialPrice.minus(current)
     .div(monitor.initialPrice)
     .times(100);
@@ -254,6 +280,11 @@ export function analyzeTradesafety(
   // Check trade size vs liquidity
   const tradeSize = new Big(priceImpact.amountIn);
   const liquidityBig = new Big(liquidity);
+
+  if (liquidityBig.lte(0)) {
+    throw new Error('liquidity must be greater than zero');
+  }
+
   const tradeSizePercent = tradeSize.div(liquidityBig).times(100);
 
   if (tradeSizePercent.gt(10)) {

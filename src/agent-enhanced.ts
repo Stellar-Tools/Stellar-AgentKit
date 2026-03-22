@@ -47,6 +47,7 @@ export interface AgentConfig {
 
 export class AgentClient {
   private network: "testnet" | "mainnet";
+  private rpcUrl?: string;
   private publicKey: string;
   private validateInput: boolean;
   private autoRetry: boolean;
@@ -80,6 +81,7 @@ export class AgentClient {
     }
 
     this.publicKey = config.publicKey || process.env.STELLAR_PUBLIC_KEY || "";
+    this.rpcUrl = config.rpcUrl;
     this.validateInput = config.validateInput !== false;
     
     // Auto-retry for reads is safe (idempotent)
@@ -126,7 +128,12 @@ export class AgentClient {
       );
     }
 
-    return await this.executeWriteWithRetry(() => bridgeTokenTool.func(params));
+    return await this.executeWriteWithRetry(() =>
+      bridgeTokenTool.func({
+        ...params,
+        ...(this.rpcUrl ? { rpcUrl: this.rpcUrl } : {}),
+      })
+    );
   }
 
   /**
@@ -206,6 +213,13 @@ export class AgentClient {
    */
   getNetwork(): "testnet" | "mainnet" {
     return this.network;
+  }
+
+  /**
+   * Get configured RPC URL, if any
+   */
+  getRpcUrl(): string | undefined {
+    return this.rpcUrl;
   }
 
   /**

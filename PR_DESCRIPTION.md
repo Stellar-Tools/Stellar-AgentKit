@@ -1,8 +1,8 @@
-# PR: Advanced SDK Features for Stellar AgentKit
+# PR: Advanced SDK Features + Event Monitoring & Slippage Safety
 
 ## 🎯 What This PR Addresses
 
-This PR introduces **4 major production-grade features** that significantly enhance the Stellar AgentKit SDK with focus on **security, user experience, smart contract optimization, and performance**. These are core SDK improvements that unlock new capabilities for Stellar DeFi developers.
+This PR introduces production-grade SDK improvements across validation, fee estimation, batch execution, optimization, event monitoring, slippage safety, and strict typing. The focus is secure defaults, safer execution, and better observability for Stellar DeFi workflows.
 
 ## ✨ Features Introduced
 
@@ -95,6 +95,18 @@ await executeBatchTransaction(batch.build(), privateKey);
 - Swap quotes: 30 second cache
 - < 0.1ms profiling overhead
 
+### 5. Event Monitoring & Transaction History
+**Problem**: No unified operation lifecycle visibility across SDK calls.
+**Solution**: Event monitoring module with status tracking, filtering, and stats.
+
+**Files**: `src/monitoring/events.ts`, `src/EVENT_MONITORING_GUIDE.md`
+
+### 6. Slippage Protection + Strict Typing
+**Problem**: Unsafe execution under volatile pricing and weak compile-time guarantees.
+**Solution**: Price-impact/slippage validation helpers and branded strict types.
+
+**Files**: `src/slippage/protection.ts`, `src/types/strict.ts`
+
 **Example**:
 ```typescript
 // First call - hits RPC
@@ -108,15 +120,11 @@ const stats = operationProfiler.getStats();
 // { getReserves: { calls: 45, avgTime: "12.5ms" } }
 ```
 
-## 📊 Statistics
+## 📊 Highlights
 
-- **600+ lines** of new core code
-- **20+ utility functions** for common operations
-- **8 custom error types** with structured context
-- **3 specialized caching systems** for Soroban
-- **20+ unit tests** covering validators and errors
-- **10+ integration tests** with real-world scenarios
-- **Zero breaking changes** - fully backward compatible
+- Comprehensive new modules for validation, fees, batch operations, optimization, monitoring, slippage, and strict types
+- Expanded test coverage for runtime-safe behavior and validation edge cases
+- Zero intentional breaking API changes
 
 ## 🔧 Code Quality
 
@@ -228,34 +236,22 @@ export { TTLCache, SorobanCaches, PriceCalculator, sorobanCaches, ... }
 export { AgentClientEnhanced }
 ```
 
-## 📋 File Structure
+## 📋 Implemented Modules
 
-```
-New Files (9):
-├── src/errors/
-│   ├── index.ts (8 error classes)
-│   └── handlers.ts (error utilities)
-├── src/validation/
-│   └── index.ts (20+ validators)
-├── src/fees/
-│   └── estimation.ts (fee estimation engine)
-├── src/operations/
-│   └── batch.ts (batch transaction builder)
-├── src/optimization/
-│   └── index.ts (caching, profiling)
-├── src/agent-enhanced.ts (integrated example)
-└── src/__tests__/
-    ├── validation.test.ts (unit tests)
-    └── integration.test.ts (real-world tests)
-
-Documentation (3):
-├── COMPREHENSIVE_PR_SUMMARY.md
-├── VALIDATION_PR.md
-├── VALIDATION_EXAMPLES.md
-
-Modified Files (1):
-└── index.ts (export new features)
-```
+- `src/errors/`
+- `src/validation/`
+- `src/fees/estimation.ts`
+- `src/operations/batch.ts`
+- `src/optimization/index.ts`
+- `src/monitoring/events.ts`
+- `src/slippage/protection.ts`
+- `src/types/strict.ts`
+- `src/agent-enhanced.ts`
+- `src/__tests__/validation.test.ts`
+- `src/__tests__/integration.test.ts`
+- `src/__tests__/monitoring.test.ts`
+- `src/__tests__/slippage.test.ts`
+- `src/__tests__/types.test.ts`
 
 ## ✅ Meets Project Criteria
 

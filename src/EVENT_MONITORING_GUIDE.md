@@ -20,7 +20,7 @@ This PR adds three critical production-grade systems to Stellar AgentKit:
 ### Key Concepts
 
 **OperationType**: Enum of all operations (SWAP, DEPOSIT, WITHDRAW, BRIDGE, STAKE, etc.)  
-**EventStatus**: Operation progress (INITIATED → VALIDATING → SIMULATING → SIGNING → SUBMITTED → CONFIRMED/FAILED)  
+**EventStatus**: Operation progress (INITIATED → VALIDATING → SIMULATING → SIGNING → SUBMITTING → CONFIRMED/FAILED)  
 **TransactionEvent**: Complete event record with details, timing, and error info
 
 ### Basic Usage
@@ -224,6 +224,8 @@ console.log(impact.executionPrice); // 0.4975
 ```typescript
 // User specifies minimum output
 const minAmountOut = '4900'; // Willing to accept 4900+ XLM
+const amountIn = poolReserves.amountIn;
+const maxAllowedSlippage = 1.0;
 
 // Validate slippage tolerance
 const validation = validateSlippage(

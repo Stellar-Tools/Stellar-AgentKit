@@ -163,7 +163,7 @@ export function validateAmount(
   }
 
   // Check maximum
-  if (maxAmount && bigAmount.gt(maxAmount)) {
+  if (maxAmount !== undefined && bigAmount.gt(maxAmount)) {
     throw new InvalidAmountError(amount as any, {
       value: bigAmount.toString(),
       maxAmount: String(maxAmount),
@@ -235,12 +235,26 @@ export interface SwapParams {
   inMax: string;
 }
 
+function validateParamsObject(params: unknown, operation: string): Record<string, any> {
+  if (params === null || params === undefined || typeof params !== 'object' || Array.isArray(params)) {
+    throw new ValidationError(
+      `Invalid ${operation} parameters: expected object`,
+      { receivedType: params === null ? 'null' : typeof params },
+      'Provide a non-null object with required parameters'
+    );
+  }
+
+  return params as Record<string, any>;
+}
+
 export function validateSwapParams(params: any): SwapParams {
+  const safeParams = validateParamsObject(params, 'swap');
+
   const validated = {
-    to: validateStellarAddress(validateRequired(params.to, 'to', 'swap')),
-    buyA: validateRequired(params.buyA, 'buyA', 'swap'),
-    out: validateAmount(validateRequired(params.out, 'out', 'swap'), { minAmount: 0 }),
-    inMax: validateAmount(validateRequired(params.inMax, 'inMax', 'swap'), { minAmount: 0 }),
+    to: validateStellarAddress(validateRequired(safeParams.to, 'to', 'swap')),
+    buyA: validateRequired(safeParams.buyA, 'buyA', 'swap'),
+    out: validateAmount(validateRequired(safeParams.out, 'out', 'swap'), { minAmount: 0 }),
+    inMax: validateAmount(validateRequired(safeParams.inMax, 'inMax', 'swap'), { minAmount: 0 }),
   };
 
   // Validate logical constraints
@@ -283,12 +297,14 @@ export interface DepositParams {
 }
 
 export function validateDepositParams(params: any): DepositParams {
+  const safeParams = validateParamsObject(params, 'deposit');
+
   const validated = {
-    to: validateStellarAddress(validateRequired(params.to, 'to', 'deposit')),
-    desiredA: validateAmount(validateRequired(params.desiredA, 'desiredA', 'deposit')),
-    minA: validateAmount(validateRequired(params.minA, 'minA', 'deposit')),
-    desiredB: validateAmount(validateRequired(params.desiredB, 'desiredB', 'deposit')),
-    minB: validateAmount(validateRequired(params.minB, 'minB', 'deposit')),
+    to: validateStellarAddress(validateRequired(safeParams.to, 'to', 'deposit')),
+    desiredA: validateAmount(validateRequired(safeParams.desiredA, 'desiredA', 'deposit')),
+    minA: validateAmount(validateRequired(safeParams.minA, 'minA', 'deposit')),
+    desiredB: validateAmount(validateRequired(safeParams.desiredB, 'desiredB', 'deposit')),
+    minB: validateAmount(validateRequired(safeParams.minB, 'minB', 'deposit')),
   };
 
   // Validate logical constraints
@@ -325,11 +341,13 @@ export interface WithdrawParams {
 }
 
 export function validateWithdrawParams(params: any): WithdrawParams {
+  const safeParams = validateParamsObject(params, 'withdraw');
+
   return {
-    to: validateStellarAddress(validateRequired(params.to, 'to', 'withdraw')),
-    shareAmount: validateAmount(validateRequired(params.shareAmount, 'shareAmount', 'withdraw')),
-    minA: validateAmount(validateRequired(params.minA, 'minA', 'withdraw')),
-    minB: validateAmount(validateRequired(params.minB, 'minB', 'withdraw')),
+    to: validateStellarAddress(validateRequired(safeParams.to, 'to', 'withdraw')),
+    shareAmount: validateAmount(validateRequired(safeParams.shareAmount, 'shareAmount', 'withdraw')),
+    minA: validateAmount(validateRequired(safeParams.minA, 'minA', 'withdraw')),
+    minB: validateAmount(validateRequired(safeParams.minB, 'minB', 'withdraw')),
   };
 }
 
@@ -343,7 +361,8 @@ export interface BridgeParams {
 }
 
 export function validateBridgeParams(params: any): BridgeParams {
-  const fromNetwork = params.fromNetwork || 'stellar-testnet';
+  const safeParams = validateParamsObject(params, 'bridge');
+  const fromNetwork = safeParams.fromNetwork || 'stellar-testnet';
 
   if (fromNetwork !== 'stellar-testnet' && fromNetwork !== 'stellar-mainnet') {
     throw new ValidationError(
@@ -353,8 +372,8 @@ export function validateBridgeParams(params: any): BridgeParams {
   }
 
   return {
-    amount: validateAmount(validateRequired(params.amount, 'amount', 'bridge')),
-    toAddress: validateRequired(params.toAddress, 'toAddress', 'bridge') as string,
+    amount: validateAmount(validateRequired(safeParams.amount, 'amount', 'bridge')),
+    toAddress: validateRequired(safeParams.toAddress, 'toAddress', 'bridge') as string,
     fromNetwork: fromNetwork as 'stellar-testnet' | 'stellar-mainnet',
   };
 }

@@ -172,13 +172,13 @@ describe('TypeScript Type Safety', () => {
 
   describe('createTransactionHash', () => {
     it('should create valid transaction hash', () => {
-      const hash = createTransactionHash('a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6');
+      const hash = createTransactionHash('a'.repeat(64));
       expect(hash).toBeDefined();
     });
 
     it('should normalize to lowercase', () => {
-      const hash = createTransactionHash('A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6');
-      expect(hash).toContain('a1b2');
+      const hash = createTransactionHash('A'.repeat(64));
+      expect(hash).toContain('aaaa');
     });
 
     it('should reject wrong length', () => {
@@ -189,7 +189,7 @@ describe('TypeScript Type Safety', () => {
 
     it('should reject invalid hex', () => {
       expect(() => {
-        createTransactionHash('z1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6');
+        createTransactionHash(`z${'a'.repeat(63)}`);
       }).toThrow();
     });
   });

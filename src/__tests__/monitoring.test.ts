@@ -75,7 +75,7 @@ describe('Event Monitoring System', () => {
       expect(event!.error!.code).toBe('INSUFFICIENT_FUNDS');
     });
 
-    it('should calculate duration when event completes', () => {
+    it('should calculate duration when event completes', async () => {
       const eventId = monitor.recordEvent(
         OperationType.SWAP,
         { amount: '100' },
@@ -83,13 +83,12 @@ describe('Event Monitoring System', () => {
       );
 
       // Small delay to have non-zero duration
-      setTimeout(() => {
-        monitor.updateStatus(eventId, EventStatus.CONFIRMED);
-        const event = monitor.getEvent(eventId);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      monitor.updateStatus(eventId, EventStatus.CONFIRMED);
+      const event = monitor.getEvent(eventId);
 
-        expect(event!.endTime).toBeDefined();
-        expect(event!.duration).toBeGreaterThanOrEqual(0);
-      }, 10);
+      expect(event!.endTime).toBeDefined();
+      expect(event!.duration).toBeGreaterThanOrEqual(0);
     });
   });
 

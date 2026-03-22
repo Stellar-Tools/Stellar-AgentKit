@@ -22,7 +22,7 @@ export interface ErrorHandlerOptions {
 export async function handleError<T>(
   fn: () => Promise<T>,
   options: ErrorHandlerOptions = {}
-): Promise<T | AgentKitError> {
+): Promise<T | AgentKitError | undefined> {
   const { logError = true, throwError = true, returnErrorObject = false } = options;
 
   try {
@@ -48,7 +48,7 @@ export async function handleError<T>(
 export function handleErrorSync<T>(
   fn: () => T,
   options: ErrorHandlerOptions = {}
-): T | AgentKitError {
+): T | AgentKitError | undefined {
   try {
     return fn();
   } catch (error) {

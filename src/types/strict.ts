@@ -1,3 +1,5 @@
+import Big from 'big.js';
+
 /**
  * Advanced TypeScript Types for Stellar AgentKit
  * 
@@ -146,7 +148,7 @@ export function createAssetSymbol(symbol: string): AssetSymbol {
  * Create Percentage (0-100)
  */
 export function createPercentage(value: number): Percentage {
-  if (value < 0 || value > 100) {
+  if (!Number.isFinite(value) || value < 0 || value > 100) {
     throw new Error(`Percentage must be between 0 and 100, got ${value}`);
   }
   
@@ -196,24 +198,37 @@ export function createTransactionHash(hash: string): TransactionHash {
 /**
  * Extract the raw value from a branded type
  */
-export function unbox<T extends { readonly __brand: string }>(value: T): string {
-  return value as unknown as string;
+export function unbox<T extends string | number>(value: T & { readonly __brand: string }): T {
+  return value as unknown as T;
+}
+
+function normalizeDecimal(value: Big): string {
+  const fixed = value.toFixed(18);
+  return fixed.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
 }
 
 /**
  * Safe amount multiplication
  */
 export function multiplyAmount(amount: Amount, multiplier: number): Amount {
-  const result = (BigInt(amount.replace('.', '')) * BigInt(Math.round(multiplier * 1000000))) / BigInt(1000000);
-  return createAmount(result.toString());
+  if (!Number.isFinite(multiplier) || multiplier < 0) {
+    throw new Error(`Invalid multiplier: ${multiplier}`);
+  }
+
+  const result = new Big(amount).times(multiplier);
+  return createAmount(normalizeDecimal(result));
 }
 
 /**
  * Safe amount division
  */
 export function divideAmount(amount: Amount, divisor: number): Amount {
-  const result = BigInt(amount.replace('.', '')) / BigInt(Math.round(divisor * 1000000));
-  return createAmount(result.toString());
+  if (!Number.isFinite(divisor) || divisor <= 0) {
+    throw new Error(`Divisor must be a finite positive number, got ${divisor}`);
+  }
+
+  const result = new Big(amount).div(divisor);
+  return createAmount(normalizeDecimal(result));
 }
 
 // ============================================================================
@@ -325,8 +340,12 @@ export function createStrictConfig(config: {
   defaultTimeout?: number;
   maxFee?: string;
 }): StrictAgentConfig {
+  if (config.network !== 'testnet' && config.network !== 'mainnet') {
+    throw new Error(`Invalid network: ${config.network}`);
+  }
+
   return {
-    network: (config.network === 'mainnet' ? 'mainnet' : 'testnet') as Network,
+    network: config.network,
     publicKey: createPublicKey(config.publicKey),
     allowMainnet: config.allowMainnet,
     defaultSlippage: createPercentage(config.defaultSlippage ?? 1),

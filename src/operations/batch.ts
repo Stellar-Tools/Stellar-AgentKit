@@ -19,6 +19,24 @@ import {
 } from "@stellar/stellar-sdk";
 import { TransactionError, ContractError, ValidationError } from "../errors";
 
+function getDefaultRpcUrl(networkPassphrase: string): string {
+  return networkPassphrase === Networks.PUBLIC
+    ? "https://mainnet.sorobanrpc.com"
+    : "https://soroban-testnet.stellar.org";
+}
+
+function parsePositiveMultiplier(value: number | undefined, fallback: number): number {
+  const resolved = value ?? fallback;
+  if (!Number.isFinite(resolved) || resolved <= 0) {
+    throw new ValidationError(
+      `Invalid feeMultiplier: ${resolved}`,
+      { feeMultiplier: resolved },
+      "feeMultiplier must be a finite positive number"
+    );
+  }
+  return resolved;
+}
+
 export interface BatchOperation {
   contract: Contract;
   functionName: string;
@@ -65,12 +83,14 @@ export class BatchTransactionBuilder {
     options: BatchTransactionOptions = {}
   ) {
     this.sourceAccount = sourceAccount;
+    const networkPassphrase = options.networkPassphrase || Networks.TESTNET;
+
     this.options = {
-      rpcUrl: options.rpcUrl || "https://soroban-testnet.stellar.org",
-      networkPassphrase: options.networkPassphrase || Networks.TESTNET,
+      rpcUrl: options.rpcUrl || getDefaultRpcUrl(networkPassphrase),
+      networkPassphrase,
       timeout: options.timeout || 300,
       memo: options.memo || "",
-      feeMultiplier: options.feeMultiplier || 1.2, // 20% extra for batch
+      feeMultiplier: parsePositiveMultiplier(options.feeMultiplier, 1.2), // 20% extra for batch
     };
   }
 
@@ -226,8 +246,9 @@ export async function executeBatchTransaction(
   privateKey: string,
   options: BatchTransactionOptions = {}
 ): Promise<BatchExecutionResult> {
-  const rpcUrl = options.rpcUrl || "https://soroban-testnet.stellar.org";
   const networkPassphrase = options.networkPassphrase || Networks.TESTNET;
+  const rpcUrl = options.rpcUrl || getDefaultRpcUrl(networkPassphrase);
+  const timeoutSeconds = options.timeout ?? 300;
 
   try {
     const server = new rpc.Server(rpcUrl, { allowHttp: true });
@@ -256,12 +277,37 @@ export async function executeBatchTransaction(
       );
     }
 
+    if (response.status === "ERROR") {
+      throw new TransactionError(
+        "Transaction submission failed",
+        { response: JSON.stringify(response), rpcUrl }
+      );
+    }
+
+    // Confirm final transaction outcome from RPC instead of assuming success on submission.
+    let finalTx: any = null;
+    const deadline = Date.now() + timeoutSeconds * 1000;
+    while (Date.now() < deadline) {
+      finalTx = await server.getTransaction(response.hash);
+      if (finalTx && (finalTx.status === "SUCCESS" || finalTx.status === "FAILED")) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+
+    if (!finalTx || finalTx.status !== "SUCCESS") {
+      throw new TransactionError(
+        "Batch transaction was submitted but not confirmed successfully",
+        { hash: response.hash, finalStatus: finalTx?.status, rpcUrl }
+      );
+    }
+
     // Parse transaction results
     const operations = (transaction as any).operations?.length || 0;
 
     return {
       transactionHash: response.hash,
-      ledger: response.ledger || 0,
+      ledger: Number(finalTx.ledger) || Number(response.ledger) || 0,
       operations,
       status: "success",
       results: Array(operations)
@@ -293,7 +339,8 @@ export async function simulateBatchTransaction(
   resourceUsage: Record<string, any>;
   success: boolean;
 }> {
-  const rpcUrl = options.rpcUrl || "https://soroban-testnet.stellar.org";
+  const networkPassphrase = options.networkPassphrase || Networks.TESTNET;
+  const rpcUrl = options.rpcUrl || getDefaultRpcUrl(networkPassphrase);
 
   try {
     const server = new rpc.Server(rpcUrl, { allowHttp: true });
@@ -307,8 +354,21 @@ export async function simulateBatchTransaction(
       );
     }
 
+    const txFee = BigInt(transaction.fee || BASE_FEE);
+    const resourceFee = (() => {
+      const minResourceFee = (simulation as any).minResourceFee;
+      if (minResourceFee === undefined || minResourceFee === null) {
+        return 0n;
+      }
+      try {
+        return BigInt(String(minResourceFee));
+      } catch {
+        return 0n;
+      }
+    })();
+
     return {
-      estimatedFee: (BigInt(transaction.fee || BASE_FEE) * BigInt(1000000000)).toString(),
+      estimatedFee: (txFee + resourceFee).toString(),
       resourceUsage: (simulation as any).results?.[0] || {},
       success: true,
     };

@@ -109,7 +109,7 @@ describe('Slippage Protection System', () => {
         10.0
       );
 
-      expect(result.warning).toBeUndefined(); // Within limits but risky
+      expect(result.warning).toBeDefined(); // Within limits but risky
     });
   });
 
@@ -124,7 +124,7 @@ describe('Slippage Protection System', () => {
       const slippageValidation = validateSlippage(
         '100',
         '99',
-        '98',
+        '98.7',
         0.5
       );
 

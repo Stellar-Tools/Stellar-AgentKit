@@ -1,13 +1,7 @@
 "use strict";
-/**
- * Advanced TypeScript Types for Stellar AgentKit
- *
- * Provides branded types and strict type safety to prevent:
- * - Invalid address usage
- * - Amount precision loss
- * - Network misconfigurations
- * - Wrong contract addresses
- */
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createPublicKey = createPublicKey;
 exports.createContractAddress = createContractAddress;
@@ -22,6 +16,7 @@ exports.unbox = unbox;
 exports.multiplyAmount = multiplyAmount;
 exports.divideAmount = divideAmount;
 exports.createStrictConfig = createStrictConfig;
+const big_js_1 = __importDefault(require("big.js"));
 // ============================================================================
 // Type Guards / Constructors
 // ============================================================================
@@ -89,7 +84,7 @@ function createAssetSymbol(symbol) {
  * Create Percentage (0-100)
  */
 function createPercentage(value) {
-    if (value < 0 || value > 100) {
+    if (!Number.isFinite(value) || value < 0 || value > 100) {
         throw new Error(`Percentage must be between 0 and 100, got ${value}`);
     }
     return value;
@@ -132,26 +127,39 @@ function createTransactionHash(hash) {
 function unbox(value) {
     return value;
 }
+function normalizeDecimal(value) {
+    const fixed = value.toFixed(18);
+    return fixed.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+}
 /**
  * Safe amount multiplication
  */
 function multiplyAmount(amount, multiplier) {
-    const result = (BigInt(amount.replace('.', '')) * BigInt(Math.round(multiplier * 1000000))) / BigInt(1000000);
-    return createAmount(result.toString());
+    if (!Number.isFinite(multiplier) || multiplier < 0) {
+        throw new Error(`Invalid multiplier: ${multiplier}`);
+    }
+    const result = new big_js_1.default(amount).times(multiplier);
+    return createAmount(normalizeDecimal(result));
 }
 /**
  * Safe amount division
  */
 function divideAmount(amount, divisor) {
-    const result = BigInt(amount.replace('.', '')) / BigInt(Math.round(divisor * 1000000));
-    return createAmount(result.toString());
+    if (!Number.isFinite(divisor) || divisor <= 0) {
+        throw new Error(`Divisor must be a finite positive number, got ${divisor}`);
+    }
+    const result = new big_js_1.default(amount).div(divisor);
+    return createAmount(normalizeDecimal(result));
 }
 /**
  * Create strict config from plain object
  */
 function createStrictConfig(config) {
+    if (config.network !== 'testnet' && config.network !== 'mainnet') {
+        throw new Error(`Invalid network: ${config.network}`);
+    }
     return {
-        network: (config.network === 'mainnet' ? 'mainnet' : 'testnet'),
+        network: config.network,
         publicKey: createPublicKey(config.publicKey),
         allowMainnet: config.allowMainnet,
         defaultSlippage: createPercentage(config.defaultSlippage ?? 1),

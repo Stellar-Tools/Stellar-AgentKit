@@ -18,6 +18,17 @@ exports.calculateOperationCost = calculateOperationCost;
 const stellar_sdk_1 = require("@stellar/stellar-sdk");
 const big_js_1 = __importDefault(require("big.js"));
 const errors_1 = require("../errors");
+function toBigOrZero(value) {
+    if (value === undefined || value === null) {
+        return new big_js_1.default(0);
+    }
+    try {
+        return new big_js_1.default(String(value));
+    }
+    catch {
+        return new big_js_1.default(0);
+    }
+}
 /**
  * Estimates Soroban operation fees
  *
@@ -27,6 +38,9 @@ const errors_1 = require("../errors");
 async function estimateSorobanFee(transaction, options = {}) {
     const { rpcUrl = "https://soroban-testnet.stellar.org", includeResourceBreakdown = true, feeMultiplier = 1.5, // 50% buffer by default
      } = options;
+    if (!Number.isFinite(feeMultiplier) || feeMultiplier <= 0) {
+        throw new errors_1.ContractError(`Invalid feeMultiplier: ${feeMultiplier}`, { feeMultiplier }, "feeMultiplier must be a finite positive number");
+    }
     try {
         const server = new stellar_sdk_1.rpc.Server(rpcUrl, { allowHttp: true });
         // Simulate the transaction to get resource usage
@@ -41,32 +55,24 @@ async function estimateSorobanFee(transaction, options = {}) {
             throw new errors_1.ContractError("Invalid simulation response: missing results", { simulation: JSON.stringify(simulation) });
         }
         const result = simulation.results[0];
-        const simLatestLedger = simulation.latestLedger || 0;
-        // Extract resource costs from simulation
-        let cpuCost = "0";
-        let memCost = "0";
-        let bandwidthCost = "0";
-        if ("resourceFee" in result) {
-            // Parse resource fees if available
-            const resourceFee = result.resourceFee || {};
-            cpuCost = String(resourceFee.cpuInsn || 0);
-            memCost = String(resourceFee.memBytes || 0);
-            bandwidthCost = String(resourceFee.bandBytes || 0);
-        }
+        // Soroban RPC v13+ exposes fees at top-level fields (e.g. minResourceFee).
+        const minResourceFee = toBigOrZero(simulation.minResourceFee);
+        const transactionDataResourceFee = toBigOrZero(simulation.transactionData?.resourceFee);
+        const resourceFeeAmount = minResourceFee.gt(0) ? minResourceFee : transactionDataResourceFee;
+        // Keep a lightweight resource breakdown for compatibility.
+        const cpuCost = includeResourceBreakdown ? String(simulation.cpuInstructions || 0) : "0";
+        const memCost = includeResourceBreakdown ? String(simulation.memoryBytes || 0) : "0";
+        const bandwidthCost = includeResourceBreakdown ? String(simulation.readWriteBytes || 0) : "0";
         // Calculate fee components
         const baseFeeAmount = new big_js_1.default(stellar_sdk_1.BASE_FEE);
-        const resourceFeeAmount = new big_js_1.default(cpuCost)
-            .plus(memCost)
-            .plus(bandwidthCost)
-            .times(0.00001); // Convert to stroops
+        const networkFeeAmount = baseFeeAmount.plus(resourceFeeAmount);
         // Apply safety multiplier for conservative estimate
-        const totalFeeAmount = baseFeeAmount
-            .plus(resourceFeeAmount)
+        const totalFeeAmount = networkFeeAmount
             .times(feeMultiplier)
             .round(0, 3); // Round up
         return {
             baseFee: baseFeeAmount.toString(),
-            networkFee: baseFeeAmount.toString(),
+            networkFee: networkFeeAmount.toString(),
             simulationFee: resourceFeeAmount.toString(),
             totalFee: totalFeeAmount.toString(),
             resourceFees: {
@@ -118,16 +124,16 @@ function estimateSwapFee(swapAmount) {
  * Estimates LP deposit fee
  */
 function estimateDepositFee(desiredAmountA, desiredAmountB) {
-    const totalAmount = new big_js_1.default(desiredAmountA).plus(desiredAmountB);
-    // LP operations typically cost more due to reserve checks
-    const depositFee = totalAmount.times(0.0005); // 0.05% deposit fee
+    // Parse amounts to fail fast on invalid numeric inputs.
+    new big_js_1.default(desiredAmountA);
+    new big_js_1.default(desiredAmountB);
+    // LP operations typically consume more network resources than swaps.
     const networkFee = new big_js_1.default(stellar_sdk_1.BASE_FEE).times(3); // Higher cost for LP
-    const totalFee = depositFee.plus(networkFee);
     return {
         baseFee: stellar_sdk_1.BASE_FEE.toString(),
         networkFee: networkFee.toString(),
-        simulationFee: depositFee.toString(),
-        totalFee: totalFee.toString(),
+        simulationFee: "0",
+        totalFee: networkFee.toString(),
         resourceFees: {
             cpu: "8000000",
             memory: "200000",
@@ -139,15 +145,14 @@ function estimateDepositFee(desiredAmountA, desiredAmountB) {
  * Estimates LP withdrawal fee
  */
 function estimateWithdrawalFee(shareAmount) {
-    const amount = new big_js_1.default(shareAmount);
-    const withdrawalFee = amount.times(0.0005); // 0.05% withdrawal fee
+    // Parse amount to fail fast on invalid numeric input.
+    new big_js_1.default(shareAmount);
     const networkFee = new big_js_1.default(stellar_sdk_1.BASE_FEE).times(2.8); // ~2.8x for withdrawal
-    const totalFee = withdrawalFee.plus(networkFee);
     return {
         baseFee: stellar_sdk_1.BASE_FEE.toString(),
         networkFee: networkFee.toString(),
-        simulationFee: withdrawalFee.toString(),
-        totalFee: totalFee.toString(),
+        simulationFee: "0",
+        totalFee: networkFee.toString(),
         resourceFees: {
             cpu: "7000000",
             memory: "150000",
@@ -163,7 +168,7 @@ function calculateOperationCost(inputAmount, estimatedOutput, fee) {
     const estimated = new big_js_1.default(estimatedOutput);
     const totalFee = new big_js_1.default(fee.totalFee);
     const slippage = input.minus(estimated);
-    const slippagePercent = slippage.div(input).times(100);
+    const slippagePercent = input.eq(0) ? new big_js_1.default(0) : slippage.div(input).times(100);
     return {
         inputAmount: input.toString(),
         outputAmount: estimated.toString(),
