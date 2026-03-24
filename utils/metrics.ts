@@ -43,8 +43,14 @@ export class TransactionMetrics {
   track(type: OperationType): (result: Omit<TransactionRecord, "id" | "type" | "timestamp" | "durationMs">) => TransactionRecord {
     const id = `${type}-${++this.idCounter}-${Date.now()}`;
     const startTime = Date.now();
+    let finished = false;
 
     return (result) => {
+      if (finished) {
+        // Return the already-recorded entry to stay idempotent
+        return this.records.find((r) => r.id === id)!;
+      }
+      finished = true;
       const record: TransactionRecord = {
         id,
         type,
@@ -74,9 +80,14 @@ export class TransactionMetrics {
     const successful = this.records.filter((r) => r.success);
     const failed = this.records.filter((r) => !r.success);
 
+    const toNumber = (s: string | undefined): number => {
+      if (!s) return 0;
+      const n = parseFloat(s);
+      return Number.isFinite(n) ? n : 0;
+    };
     const totalVolume = this.records
       .filter((r) => r.inputAmount)
-      .reduce((acc, r) => acc + parseFloat(r.inputAmount!), 0);
+      .reduce((acc, r) => acc + toNumber(r.inputAmount), 0);
 
     const slippageRecords = this.records.filter(
       (r) => r.slippagePct !== undefined && r.success

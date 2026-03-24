@@ -107,7 +107,7 @@ export class AgentClient {
         params.out,
         params.inMax
       );
-      finish({ success: true, inputAmount: params.inMax });
+      finish({ success: true, inputAmount: params.inMax, outputAmount: params.out });
       return result;
     } catch (err) {
       finish({ success: false, errorMessage: err instanceof Error ? err.message : String(err) });
@@ -159,14 +159,22 @@ export class AgentClient {
       desiredB: string;
       minB: string;
     }) => {
-      return await contractDeposit(
-        this.publicKey,
-        params.to,
-        params.desiredA,
-        params.minA,
-        params.desiredB,
-        params.minB
-      );
+      const finish = this.metrics.track("lp_deposit");
+      try {
+        const result = await contractDeposit(
+          this.publicKey,
+          params.to,
+          params.desiredA,
+          params.minA,
+          params.desiredB,
+          params.minB
+        );
+        finish({ success: true, inputAmount: params.desiredA });
+        return result;
+      } catch (err) {
+        finish({ success: false, errorMessage: err instanceof Error ? err.message : String(err) });
+        throw err;
+      }
     },
 
     withdraw: async (params: {
@@ -175,13 +183,21 @@ export class AgentClient {
       minA: string;
       minB: string;
     }) => {
-      return await contractWithdraw(
-        this.publicKey,
-        params.to,
-        params.shareAmount,
-        params.minA,
-        params.minB
-      );
+      const finish = this.metrics.track("lp_withdraw");
+      try {
+        const result = await contractWithdraw(
+          this.publicKey,
+          params.to,
+          params.shareAmount,
+          params.minA,
+          params.minB
+        );
+        finish({ success: true, inputAmount: params.shareAmount });
+        return result;
+      } catch (err) {
+        finish({ success: false, errorMessage: err instanceof Error ? err.message : String(err) });
+        throw err;
+      }
     },
 
     getReserves: async () => {
