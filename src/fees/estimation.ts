@@ -131,20 +131,29 @@ export async function estimateSorobanFee(
 export function estimateSwapFee(swapAmount: string): FeeEstimate {
   const amount = new Big(swapAmount);
 
+  // Validate amount
+  if (amount.lte(0)) {
+    throw new ContractError(
+      `Invalid swap amount: ${swapAmount}`,
+      { swapAmount },
+      "Swap amount must be positive"
+    );
+  }
+
   // Typical swap costs on Soroban (in stroops)
   // Network fee is fixed Soroban operation cost
   const networkFee = new Big(BASE_FEE).times(2.5); // ~2.5x base for swap
 
-  // Slippage is a percentage of the TOKEN amount, not stroops
+  // NOTE: Slippage is a percentage of the TOKEN amount, not stroops
   // Example: 1% slippage on 1000 USDC = 10 USDC loss
-  // This is separate from the network fee
-  const protocolSlippage = amount.times(0.003); // 0.3% protocol fee
+  // This is separate from the network fee and should be handled independently
+  // DO NOT mix slippage with network fees in the return value
 
   return {
     baseFee: BASE_FEE.toString(),
     networkFee: networkFee.toString(),
-    simulationFee: protocolSlippage.toString(), // Slippage in token units
-    totalFee: networkFee.toString(), // Only stroops, not token amounts
+    simulationFee: "0",  // Simulation fee in stroops (actual value depends on pool state)
+    totalFee: networkFee.toString(), // Network fee only in stroops
     resourceFees: {
       cpu: "5000000", // Approximate CPU cost
       memory: "100000",

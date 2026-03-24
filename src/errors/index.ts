@@ -34,7 +34,7 @@ export class AgentKitError extends Error {
 
   /**
    * Get human-readable error message with context and suggestion
-   * Safely handles non-serializable values like BigInt
+   * Safely handles non-serializable values like BigInt at any nesting level
    */
   getFormattedMessage(): string {
     let output = `${this.name} [${this.code}]\n${this.message}`;
@@ -54,7 +54,13 @@ export class AgentKitError extends Error {
               return `  ${k}: null`;
             }
             try {
-              return `  ${k}: ${JSON.stringify(v)}`;
+              // Replacer function handles BigInt at all nesting levels
+              return `  ${k}: ${JSON.stringify(v, (_key, value) => {
+                if (typeof value === 'bigint') {
+                  return `${value.toString()}n`;
+                }
+                return value;
+              })}`;
             } catch {
               return `  ${k}: [Unserializable: ${typeof v}]`;
             }
