@@ -84,6 +84,14 @@ export class AgentClient {
         // In a real SDK, we might not throw here if only read-only methods are used,
         // but for this implementation, we'll assume it's needed for most actions.
     }
+
+    this.simulate = createSimulator({
+      server: new Server(this.rpcUrl),
+      network: this.network,
+      buildSwapTx: async (params) => ({ simulate: true, params }),
+      buildLpDepositTx: async (params) => ({ simulate: true, params }),
+      buildLpWithdrawTx: async (params) => ({ simulate: true, params }),
+    });
   }
 
   /**
