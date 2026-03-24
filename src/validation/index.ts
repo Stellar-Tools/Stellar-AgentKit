@@ -161,7 +161,7 @@ export function validateAmount(
   }
 
   // Check maximum
-  if (maxAmount && bigAmount.gt(maxAmount)) {
+  if (maxAmount !== undefined && bigAmount.gt(maxAmount)) {
     throw new InvalidAmountError(amount as any, {
       value: bigAmount.toString(),
       maxAmount: String(maxAmount),
@@ -234,6 +234,13 @@ export interface SwapParams {
 }
 
 export function validateSwapParams(params: any): SwapParams {
+  if (!params || typeof params !== 'object') {
+    throw new ValidationError(
+      'swap parameters must be a non-null object',
+      { params },
+      'Provide a valid object with required fields: to, buyA, out, inMax'
+    );
+  }
   const validated = {
     to: validateStellarAddress(validateRequired(params.to, 'to', 'swap')),
     buyA: validateRequired(params.buyA, 'buyA', 'swap'),
@@ -281,6 +288,13 @@ export interface DepositParams {
 }
 
 export function validateDepositParams(params: any): DepositParams {
+  if (!params || typeof params !== 'object') {
+    throw new ValidationError(
+      'deposit parameters must be a non-null object',
+      { params },
+      'Provide a valid object with required fields: to, desiredA, minA, desiredB, minB'
+    );
+  }
   const validated = {
     to: validateStellarAddress(validateRequired(params.to, 'to', 'deposit')),
     desiredA: validateAmount(validateRequired(params.desiredA, 'desiredA', 'deposit')),
@@ -323,6 +337,13 @@ export interface WithdrawParams {
 }
 
 export function validateWithdrawParams(params: any): WithdrawParams {
+  if (!params || typeof params !== 'object') {
+    throw new ValidationError(
+      'withdraw parameters must be a non-null object',
+      { params },
+      'Provide a valid object with required fields: to, shareAmount, minA, minB'
+    );
+  }
   return {
     to: validateStellarAddress(validateRequired(params.to, 'to', 'withdraw')),
     shareAmount: validateAmount(validateRequired(params.shareAmount, 'shareAmount', 'withdraw')),
@@ -341,12 +362,20 @@ export interface BridgeParams {
 }
 
 export function validateBridgeParams(params: any): BridgeParams {
-  const fromNetwork = params.fromNetwork || 'stellar-testnet';
+  if (!params || typeof params !== 'object') {
+    throw new ValidationError(
+      'bridge parameters must be a non-null object',
+      { params },
+      'Provide a valid object with required fields: amount, toAddress'
+    );
+  }
+  const fromNetwork = params.fromNetwork ?? 'stellar-testnet';
 
   if (fromNetwork !== 'stellar-testnet' && fromNetwork !== 'stellar-mainnet') {
     throw new ValidationError(
-      'Invalid fromNetwork value',
-      { received: fromNetwork, allowed: ['stellar-testnet', 'stellar-mainnet'] }
+      `Invalid fromNetwork value: "${fromNetwork}"`,
+      { received: fromNetwork, allowed: ['stellar-testnet', 'stellar-mainnet'] },
+      'Use either "stellar-testnet" or "stellar-mainnet"'
     );
   }
 
