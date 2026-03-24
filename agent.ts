@@ -6,6 +6,7 @@ import {
   getShareId as contractGetShareId,
 } from "./lib/contract";
 import { bridgeTokenTool } from "./tools/bridge";
+import { AntigravityEngine } from "./lib/transaction system/engine";
 
 export interface AgentConfig {
   network: "testnet" | "mainnet";
@@ -17,6 +18,7 @@ export interface AgentConfig {
 export class AgentClient {
   private network: "testnet" | "mainnet";
   private publicKey: string;
+  public antigravity: AntigravityEngine;
 
   constructor(config: AgentConfig) {
     // Mainnet safety check for general operations
@@ -40,11 +42,13 @@ export class AgentClient {
 
     this.network = config.network;
     this.publicKey = config.publicKey || process.env.STELLAR_PUBLIC_KEY || "";
-    
+
     if (!this.publicKey && this.network === "testnet") {
-        // In a real SDK, we might not throw here if only read-only methods are used,
-        // but for this implementation, we'll assume it's needed for most actions.
+      // In a real SDK, we might not throw here if only read-only methods are used,
+      // but for this implementation, we'll assume it's needed for most actions.
     }
+
+    this.antigravity = new AntigravityEngine(this);
   }
 
   /**

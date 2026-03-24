@@ -16,6 +16,7 @@ exports.claimRewards = claimRewards;
 exports.getStake = getStake;
 const stellar_sdk_1 = require("@stellar/stellar-sdk");
 const stellar_1 = require("./stellar");
+const buildTransaction_1 = require("../utils/buildTransaction");
 // Configuration
 const rpcUrl = "https://soroban-testnet.stellar.org";
 const contractAddress = "CBTYOERLDPHPODHLZ7XKPUIJJTEZKYMBKEUA2JBCRPRMMDK6A4GM2UZF"; // Replace with actual deployed contract address
@@ -38,31 +39,13 @@ const contractInt = (caller, functName, values) => __awaiter(void 0, void 0, voi
             throw new Error(`Failed to fetch account ${caller}: ${err.message}`);
         });
         const contract = new stellar_sdk_1.Contract(contractAddress);
-        const params = {
-            fee: stellar_sdk_1.BASE_FEE,
-            networkPassphrase,
+        // Build transaction using unified builder
+        const sorobanOperation = {
+            contract,
+            functionName: functName,
+            args: values == null ? undefined : Array.isArray(values) ? values : [values],
         };
-        // Build transaction
-        let transaction;
-        const builder = new stellar_sdk_1.TransactionBuilder(sourceAccount, params);
-        if (values == null) {
-            transaction = builder
-                .addOperation(contract.call(functName))
-                .setTimeout(30)
-                .build();
-        }
-        else if (Array.isArray(values)) {
-            transaction = builder
-                .addOperation(contract.call(functName, ...values))
-                .setTimeout(30)
-                .build();
-        }
-        else {
-            transaction = builder
-                .addOperation(contract.call(functName, values))
-                .setTimeout(30)
-                .build();
-        }
+        const transaction = (0, buildTransaction_1.buildTransaction)("stake", sourceAccount, sorobanOperation);
         // Prepare and sign transaction
         const preparedTx = yield server.prepareTransaction(transaction).catch((err) => {
             throw new Error(`Failed to prepare transaction: ${err.message}`);

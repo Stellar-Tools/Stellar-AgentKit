@@ -1,0 +1,18 @@
+import { SplAssociatedTokenInstructionCoder } from "./instruction.js";
+import { SplAssociatedTokenStateCoder } from "./state.js";
+import { SplAssociatedTokenAccountsCoder } from "./accounts.js";
+import { SplAssociatedTokenEventsCoder } from "./events.js";
+import { SplAssociatedTokenTypesCoder } from "./types.js";
+/**
+ * Coder for the SPL token program.
+ */
+export class SplAssociatedTokenCoder {
+    constructor(idl) {
+        this.instruction = new SplAssociatedTokenInstructionCoder(idl);
+        this.accounts = new SplAssociatedTokenAccountsCoder(idl);
+        this.events = new SplAssociatedTokenEventsCoder(idl);
+        this.state = new SplAssociatedTokenStateCoder(idl);
+        this.types = new SplAssociatedTokenTypesCoder(idl);
+    }
+}
+//# sourceMappingURL=index.js.map
