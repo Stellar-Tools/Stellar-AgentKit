@@ -1,5 +1,10 @@
 # Stellar AgentKit 🌟
 
+[![Tests](https://github.com/Stellar-Tools/Stellar-AgentKit/actions/workflows/test.yml/badge.svg)](https://github.com/Stellar-Tools/Stellar-AgentKit/actions/workflows/test.yml)
+[![Code Coverage](https://github.com/Stellar-Tools/Stellar-AgentKit/actions/workflows/coverage.yml/badge.svg)](https://github.com/Stellar-Tools/Stellar-AgentKit/actions/workflows/coverage.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+
 Stellar AgentKit is an open-source SDK and platform for interacting with the Stellar blockchain,
 providing a unified agent to perform complex DeFi operations such as swaps, bridges, and liquidity
 pool (LP) actions.
