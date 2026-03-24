@@ -26,7 +26,12 @@ export const StellarContractTool = new DynamicStructuredTool({
     amount: z.number().optional(), // For stake/unstake
     userAddress: z.string().optional(), // For get_stake
   }),
+<<<<<<< HEAD
   func: async ({ action, tokenAddress, rewardRate, amount, userAddress }: any) => {
+=======
+  func: async (input: any) => {
+    const { action, tokenAddress, rewardRate, amount, userAddress } = input;
+>>>>>>> upstream/main
     try {
       switch (action) {
         case "initialize": {
