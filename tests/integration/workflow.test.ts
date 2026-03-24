@@ -1,77 +1,80 @@
 import { describe, it, expect } from 'vitest';
-import { Networks } from '@stellar/stellar-sdk';
+import { AgentClient } from '../../agent';
 
 describe('Tool Integration Workflows', () => {
-  describe('Multi-step Operations', () => {
-    it('should validate network configuration before operations', () => {
-      const network = 'testnet';
-      const validNetworks = ['testnet', 'mainnet'];
-      
-      expect(validNetworks).toContain(network);
-    });
-
-    it('should handle operation sequencing correctly', () => {
-      const operations = ['swap', 'deposit', 'withdraw'];
-      const validOperations = ['swap', 'deposit', 'withdraw', 'get_share_id', 'get_reserves'];
-      
-      operations.forEach(op => {
-        expect(validOperations).toContain(op);
+  describe('AgentClient Initialization', () => {
+    it('should create a testnet client without errors', () => {
+      const agent = new AgentClient({
+        network: 'testnet',
+        publicKey: 'GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7',
       });
+      expect(agent).toBeDefined();
     });
 
-    it('should validate parameters before execution', () => {
-      const params = {
-        amount: '100',
-        action: 'swap',
-      };
-      
-      expect(params.amount).toBeDefined();
-      expect(params.action).toBeDefined();
-      expect(parseFloat(params.amount)).toBeGreaterThan(0);
+    it('should block mainnet without allowMainnet flag', () => {
+      expect(() => {
+        new AgentClient({ network: 'mainnet' });
+      }).toThrow(/[Mm]ainnet/);
+    });
+
+    it('should allow mainnet with allowMainnet flag', () => {
+      const agent = new AgentClient({
+        network: 'mainnet',
+        allowMainnet: true,
+        publicKey: 'GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7',
+      });
+      expect(agent).toBeDefined();
     });
   });
 
-  describe('Error Handling', () => {
-    it('should handle missing required parameters', () => {
-      const params = {
-        action: 'initialize',
-        tokenAddress: undefined,
-      };
-      
-      const isValid = params.tokenAddress !== undefined;
-      expect(isValid).toBe(false);
-    });
-
-    it('should handle invalid network selection', () => {
-      const invalidNetwork = 'invalid-network';
-      const validNetworks = ['testnet', 'mainnet'];
-      
-      expect(validNetworks).not.toContain(invalidNetwork);
-    });
-
-    it('should handle invalid amount formats', () => {
-      const invalidAmounts = ['', 'abc', '-100', 'null'];
-      
-      invalidAmounts.forEach(amount => {
-        const parsed = parseFloat(amount);
-        expect(isNaN(parsed) || parsed <= 0).toBe(true);
+  describe('Token Launch Validation', () => {
+    it('should reject mainnet token launches', async () => {
+      const agent = new AgentClient({
+        network: 'mainnet',
+        allowMainnet: true,
+        publicKey: 'GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7',
       });
-    });
-  });
 
-  describe('Network Passphrase Validation', () => {
-    it('should use correct passphrase for testnet', () => {
-      const testnetPassphrase = Networks.TESTNET;
-      expect(testnetPassphrase).toBe("Test SDF Network ; September 2015");
-    });
-
-    it('should use correct passphrase for mainnet', () => {
-      const mainnetPassphrase = Networks.PUBLIC;
-      expect(mainnetPassphrase).toBe("Public Global Stellar Network ; September 2015");
+      await expect(
+        agent.launchToken({
+          code: 'TEST',
+          issuerSecret: 'SCZANGBA5YHTNYVVV3C7CAZMCLPT4R3YNWECOUL6XELXHBCHJ3MGQOOY',
+          distributorSecret: 'SCZANGBA5YHTNYVVV3C7CAZMCLPT4R3YNWECOUL6XELXHBCHJ3MGQOOY',
+          initialSupply: '1000',
+        })
+      ).rejects.toThrow(/[Mm]ainnet/);
     });
 
-    it('should differentiate between network passphrases', () => {
-      expect(Networks.TESTNET).not.toBe(Networks.PUBLIC);
+    it('should reject invalid asset codes', async () => {
+      const agent = new AgentClient({
+        network: 'testnet',
+        publicKey: 'GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7',
+      });
+
+      await expect(
+        agent.launchToken({
+          code: 'TOOLONGASSETCODE123',
+          issuerSecret: 'SCZANGBA5YHTNYVVV3C7CAZMCLPT4R3YNWECOUL6XELXHBCHJ3MGQOOY',
+          distributorSecret: 'SCZANGBA5YHTNYVVV3C7CAZMCLPT4R3YNWECOUL6XELXHBCHJ3MGQOOY',
+          initialSupply: '1000',
+        })
+      ).rejects.toThrow(/[Aa]sset code/);
+    });
+
+    it('should reject asset codes with special characters', async () => {
+      const agent = new AgentClient({
+        network: 'testnet',
+        publicKey: 'GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7',
+      });
+
+      await expect(
+        agent.launchToken({
+          code: 'MY-TOKEN!',
+          issuerSecret: 'SCZANGBA5YHTNYVVV3C7CAZMCLPT4R3YNWECOUL6XELXHBCHJ3MGQOOY',
+          distributorSecret: 'SCZANGBA5YHTNYVVV3C7CAZMCLPT4R3YNWECOUL6XELXHBCHJ3MGQOOY',
+          initialSupply: '1000',
+        })
+      ).rejects.toThrow(/alphanumeric/);
     });
   });
 });

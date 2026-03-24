@@ -186,7 +186,11 @@ None
 
 ```typescript
 const reserves = await agent.lp.getReserves();
-console.log(`Reserve A: ${reserves[0]}, Reserve B: ${reserves[1]}`);
+if (reserves) {
+  console.log(`Reserve A: ${reserves[0]}, Reserve B: ${reserves[1]}`);
+} else {
+  console.log("No reserves available");
+}
 ```
 
 ### `lp.getShareId()`
@@ -206,6 +210,95 @@ None
 ```typescript
 const shareId = await agent.lp.getShareId();
 console.log(`Share Token ID: ${shareId}`);
+```
+
+---
+
+## 💸 sendPayment()
+
+Sends XLM or any Stellar asset to another account.
+
+#### Parameters
+
+```typescript
+{
+  to: string;           // Recipient Stellar address (G...)
+  amount: string;       // Amount to send (e.g. "100")
+  asset_code?: string;  // Asset code for custom tokens (e.g. "USDC"). Omit for native XLM
+  asset_issuer?: string; // Required when asset_code is set. Issuer public key
+  memo?: string;        // Optional text memo (max 28 bytes)
+}
+```
+
+#### Returns
+
+`Promise<string>` - Transaction result as JSON string
+
+#### Example
+
+```typescript
+// Send XLM
+await agent.sendPayment({ to: "GCXXX...", amount: "10" });
+
+// Send USDC
+await agent.sendPayment({
+  to: "GCXXX...",
+  amount: "50",
+  asset_code: "USDC",
+  asset_issuer: "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+  memo: "Invoice #42",
+});
+```
+
+---
+
+## 💰 getBalance()
+
+Returns XLM and token balances for a Stellar account.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `publicKey` | `string` | ❌ | Stellar public key to query. Defaults to AgentClient's publicKey |
+
+#### Returns
+
+`Promise<string>` - JSON string with balances array
+
+#### Example
+
+```typescript
+const result = await agent.getBalance();
+const parsed = JSON.parse(result);
+console.log(parsed.balances);
+// [{ asset: 'XLM', balance: '99.9999600' }, { asset: 'USDC:GA5Z...', balance: '50.0000000' }]
+```
+
+---
+
+## 📋 getAccountInfo()
+
+Returns full account information for a Stellar address.
+
+#### Parameters
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `publicKey` | `string` | ❌ | Stellar public key to query. Defaults to AgentClient's publicKey |
+
+#### Returns
+
+`Promise<string>` - JSON string with sequence, thresholds, flags, signers, data entries
+
+#### Example
+
+```typescript
+const info = await agent.getAccountInfo();
+const parsed = JSON.parse(info);
+console.log(parsed.sequence);       // "12345678"
+console.log(parsed.signers);        // [{ key: "G...", weight: 1, type: "ed25519_public_key" }]
+console.log(parsed.dataEntries);    // { "key": "base64value" }
 ```
 
 ---

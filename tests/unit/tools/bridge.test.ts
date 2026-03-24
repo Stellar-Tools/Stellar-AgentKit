@@ -1,80 +1,39 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { Networks } from '@stellar/stellar-sdk';
+import { describe, it, expect } from 'vitest';
+import { bridgeTokenTool } from '../../tools/bridge';
 
-type StellarNetwork = "stellar-testnet" | "stellar-mainnet";
-
-describe('Bridge Tool - Network Configuration', () => {
-  const STELLAR_NETWORK_CONFIG: Record<StellarNetwork, { networkPassphrase: string }> = {
-    "stellar-testnet": {
-      networkPassphrase: Networks.TESTNET,
-    },
-    "stellar-mainnet": {
-      networkPassphrase: Networks.PUBLIC,
-    },
-  };
-
-  describe('Type Safety', () => {
-    it('should have correct network configuration type', () => {
-      const testNetwork: StellarNetwork = "stellar-testnet";
-      expect(testNetwork).toBe("stellar-testnet");
+describe('Bridge Tool', () => {
+  describe('Tool Definition', () => {
+    it('should have correct tool name', () => {
+      expect(bridgeTokenTool.name).toBe('bridge_token');
     });
 
-    it('should validate network options', () => {
-      const validNetworks: StellarNetwork[] = ["stellar-testnet", "stellar-mainnet"];
-      expect(validNetworks).toContain("stellar-testnet");
-      expect(validNetworks).toContain("stellar-mainnet");
-      expect(validNetworks).toHaveLength(2);
+    it('should have a description', () => {
+      expect(bridgeTokenTool.description).toBeTruthy();
+      expect(bridgeTokenTool.description.length).toBeGreaterThan(0);
+    });
+
+    it('should have a schema defined', () => {
+      expect(bridgeTokenTool.schema).toBeDefined();
     });
   });
 
-  describe('Network Passphrases', () => {
-    it('should have correct testnet passphrase', () => {
-      expect(STELLAR_NETWORK_CONFIG["stellar-testnet"].networkPassphrase).toBe(Networks.TESTNET);
-      expect(STELLAR_NETWORK_CONFIG["stellar-testnet"].networkPassphrase).toBe("Test SDF Network ; September 2015");
-    });
+  describe('Mainnet Safety', () => {
+    it('should block mainnet bridging when ALLOW_MAINNET_BRIDGE is not set', async () => {
+      const originalEnv = process.env.ALLOW_MAINNET_BRIDGE;
+      delete process.env.ALLOW_MAINNET_BRIDGE;
 
-    it('should have correct mainnet passphrase', () => {
-      expect(STELLAR_NETWORK_CONFIG["stellar-mainnet"].networkPassphrase).toBe(Networks.PUBLIC);
-      expect(STELLAR_NETWORK_CONFIG["stellar-mainnet"].networkPassphrase).toBe("Public Global Stellar Network ; September 2015");
-    });
+      await expect(
+        bridgeTokenTool.func({
+          amount: "100",
+          toAddress: "0x742d35Cc6Db050e3797bf604dC8a98c13a0e002E",
+          fromNetwork: "stellar-mainnet",
+        })
+      ).rejects.toThrow(/[Mm]ainnet/);
 
-    it('should have passphrase for both networks', () => {
-      expect(STELLAR_NETWORK_CONFIG["stellar-testnet"]).toBeDefined();
-      expect(STELLAR_NETWORK_CONFIG["stellar-mainnet"]).toBeDefined();
-    });
-  });
-
-  describe('Mainnet Safeguards', () => {
-    it('should block mainnet when ALLOW_MAINNET_BRIDGE is not set', () => {
-      const fromNetwork: StellarNetwork = "stellar-mainnet";
-      const allowMainnetBridge = undefined;
-      
-      const shouldBlock = fromNetwork === "stellar-mainnet" && allowMainnetBridge !== "true";
-      expect(shouldBlock).toBe(true);
-    });
-
-    it('should block mainnet when ALLOW_MAINNET_BRIDGE is false', () => {
-      const fromNetwork: StellarNetwork = "stellar-mainnet";
-      const allowMainnetBridge = "false";
-      
-      const shouldBlock = fromNetwork === "stellar-mainnet" && allowMainnetBridge !== "true";
-      expect(shouldBlock).toBe(true);
-    });
-
-    it('should allow mainnet when ALLOW_MAINNET_BRIDGE is true', () => {
-      const fromNetwork: StellarNetwork = "stellar-mainnet";
-      const allowMainnetBridge = "true";
-      
-      const shouldBlock = fromNetwork === "stellar-mainnet" && allowMainnetBridge !== "true";
-      expect(shouldBlock).toBe(false);
-    });
-
-    it('should always allow testnet regardless of ALLOW_MAINNET_BRIDGE', () => {
-      const fromNetwork: StellarNetwork = "stellar-testnet";
-      const allowMainnetBridge = undefined;
-      
-      const shouldBlock = fromNetwork === "stellar-mainnet" && allowMainnetBridge !== "true";
-      expect(shouldBlock).toBe(false);
+      // Restore
+      if (originalEnv !== undefined) {
+        process.env.ALLOW_MAINNET_BRIDGE = originalEnv;
+      }
     });
   });
 });

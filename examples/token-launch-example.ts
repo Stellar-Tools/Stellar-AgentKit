@@ -22,14 +22,17 @@ async function exampleTokenLaunch() {
       // No allowMainnet flag needed for testnet
     });
 
-    // Generate test keypairs (in real usage, you'd use existing funded accounts)
+    // Generate test keypairs
+    // ⚠️ In real usage, use existing FUNDED accounts. Random keypairs need
+    // testnet funding (e.g. via Friendbot) before launchToken will work.
     const issuerKeypair = Keypair.random();
     const distributorKeypair = Keypair.random();
 
     console.log("Generated test accounts:");
     console.log(`Issuer Public Key: ${issuerKeypair.publicKey()}`);
     console.log(`Distributor Public Key: ${distributorKeypair.publicKey()}`);
-    console.log("\n⚠️  Remember to fund these accounts on testnet before launching!");
+    console.log("\n⚠️  These accounts must be funded before launching!");
+    console.log("Fund via Stellar Friendbot: https://friendbot.stellar.org/?addr=<PUBLIC_KEY>");
 
     // Token launch parameters
     const launchParams = {

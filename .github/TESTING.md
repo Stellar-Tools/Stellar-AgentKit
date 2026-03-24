@@ -19,18 +19,13 @@ npm run test:ui
 
 ### Continuous Integration
 
-This project uses GitHub Actions for automated testing:
+CI workflows can be added via GitHub Actions. See the `.github/workflows/` directory for available workflows.
 
-#### Test Workflow (`.github/workflows/test.yml`)
+When configured, CI typically:
 - Runs on every push and pull request
 - Tests against Node.js 18.x and 20.x
 - Executes full test suite
-- Verifies build compilation
-
-#### Coverage Workflow (`.github/workflows/coverage.yml`)
 - Generates code coverage reports
-- Uploads to Codecov (if configured)
-- Runs on main branch and pull requests
 
 ### Writing Tests
 

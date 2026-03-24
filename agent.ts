@@ -536,8 +536,14 @@ export class AgentClient {
   }
 
   /**
-   * Lock an issuer account by setting master weight to 0.
-   * ⚠️ IRREVERSIBLE!
+   * Lock an issuer account by setting all thresholds to 0 and master weight to 0.
+   * 
+   * ⚠️ IRREVERSIBLE! This fully freezes the issuer account by:
+   * - Setting masterWeight to 0 (disables master key)
+   * - Setting low/med/high thresholds to 0 (prevents any operation, even with other signers)
+   * 
+   * After locking, NO signer (including any pre-existing ones) can authorize operations
+   * on this account. The supply becomes truly fixed.
    */
   private async lockIssuerAccount(
     server: Server,
@@ -546,6 +552,17 @@ export class AgentClient {
   ): Promise<{ hash: string }> {
     try {
       const issuerAccount = await server.loadAccount(issuerKeypair.publicKey());
+
+      // Verify no other signers exist that could bypass the lock
+      const otherSigners = issuerAccount.signers.filter(
+        (s) => s.key !== issuerKeypair.publicKey() && s.weight > 0
+      );
+      if (otherSigners.length > 0) {
+        throw new Error(
+          `Issuer account has ${otherSigners.length} additional signer(s). ` +
+          `Remove all extra signers before locking to ensure the account is fully immutable.`
+        );
+      }
       
       const transaction = new TransactionBuilder(issuerAccount, {
         fee: BASE_FEE,
@@ -553,7 +570,10 @@ export class AgentClient {
       })
         .addOperation(
           Operation.setOptions({
-            masterWeight: 0
+            masterWeight: 0,
+            lowThreshold: 0,
+            medThreshold: 0,
+            highThreshold: 0
           })
         )
         .setTimeout(30)

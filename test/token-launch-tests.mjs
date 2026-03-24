@@ -580,3 +580,8 @@ console.log("- Issuer account locking is IRREVERSIBLE on mainnet");
 console.log("- Keep issuer secrets secure and never log them");
 
 console.log("=".repeat(60));
+
+// Exit with non-zero status on failure so CI detects it
+if (testsFailed > 0) {
+  process.exit(1);
+}
