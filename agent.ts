@@ -1,3 +1,4 @@
+import { TransactionMetrics } from "./utils/metrics";
 import {
   swap as contractSwap,
   deposit as contractDeposit,
@@ -53,6 +54,7 @@ export class AgentClient {
   private network: "testnet" | "mainnet";
   private publicKey: string;
   private rpcUrl: string;
+  public readonly metrics: TransactionMetrics = new TransactionMetrics();
 
   constructor(config: AgentConfig) {
     // Mainnet safety check for general operations
@@ -96,13 +98,21 @@ export class AgentClient {
     out: string;
     inMax: string;
   }) {
-    return await contractSwap(
-      this.publicKey,
-      params.to,
-      params.buyA,
-      params.out,
-      params.inMax
-    );
+    const finish = this.metrics.track("swap");
+    try {
+      const result = await contractSwap(
+        this.publicKey,
+        params.to,
+        params.buyA,
+        params.out,
+        params.inMax
+      );
+      finish({ success: true, inputAmount: params.inMax });
+      return result;
+    } catch (err) {
+      finish({ success: false, errorMessage: err instanceof Error ? err.message : String(err) });
+      throw err;
+    }
   }
 
   /**
@@ -121,13 +131,21 @@ export class AgentClient {
     amount: string;
     toAddress: string;
   }) {
-    return await bridgeTokenTool.func({
-      ...params,
-      fromNetwork:
-        this.network === "mainnet"
-          ? "stellar-mainnet"
-          : "stellar-testnet",
-    });
+    const finish = this.metrics.track("bridge");
+    try {
+      const result = await bridgeTokenTool.func({
+        ...params,
+        fromNetwork:
+          this.network === "mainnet"
+            ? "stellar-mainnet"
+            : "stellar-testnet",
+      });
+      finish({ success: true, inputAmount: params.amount });
+      return result;
+    } catch (err) {
+      finish({ success: false, errorMessage: err instanceof Error ? err.message : String(err) });
+      throw err;
+    }
   }
 
   /**
