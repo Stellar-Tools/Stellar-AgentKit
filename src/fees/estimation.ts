@@ -129,9 +129,19 @@ export async function estimateSorobanFee(
  * Slippage tolerance should be applied to expected output separately.
  */
 export function estimateSwapFee(swapAmount: string): FeeEstimate {
-  const amount = new Big(swapAmount);
+  // Validate input format before processing
+  let amount: Big;
+  try {
+    amount = new Big(swapAmount);
+  } catch (error) {
+    throw new ContractError(
+      `Invalid swap amount format: "${swapAmount}"`,
+      { swapAmount, originalError: String(error) },
+      "Swap amount must be a valid numeric string (e.g., '1000', '1000.50')"
+    );
+  }
 
-  // Validate amount
+  // Validate amount value
   if (amount.lte(0)) {
     throw new ContractError(
       `Invalid swap amount: ${swapAmount}`,
@@ -169,7 +179,29 @@ export function estimateDepositFee(
   desiredAmountA: string,
   desiredAmountB: string
 ): FeeEstimate {
-  const totalAmount = new Big(desiredAmountA).plus(desiredAmountB);
+  // Validate input formats before processing
+  let amountA: Big;
+  let amountB: Big;
+  try {
+    amountA = new Big(desiredAmountA);
+  } catch (error) {
+    throw new ContractError(
+      `Invalid deposit amount A format: "${desiredAmountA}"`,
+      { desiredAmountA, originalError: String(error) },
+      "Amount must be a valid numeric string (e.g., '1000', '1000.50')"
+    );
+  }
+  try {
+    amountB = new Big(desiredAmountB);
+  } catch (error) {
+    throw new ContractError(
+      `Invalid deposit amount B format: "${desiredAmountB}"`,
+      { desiredAmountB, originalError: String(error) },
+      "Amount must be a valid numeric string (e.g., '1000', '1000.50')"
+    );
+  }
+
+  const totalAmount = amountA.plus(amountB);
 
   // LP operations typically cost more due to reserve checks
   const depositFee = totalAmount.times(0.0005); // 0.05% deposit fee
@@ -194,7 +226,17 @@ export function estimateDepositFee(
  * Estimates LP withdrawal fee
  */
 export function estimateWithdrawalFee(shareAmount: string): FeeEstimate {
-  const amount = new Big(shareAmount);
+  // Validate input format before processing
+  let amount: Big;
+  try {
+    amount = new Big(shareAmount);
+  } catch (error) {
+    throw new ContractError(
+      `Invalid share amount format: "${shareAmount}"`,
+      { shareAmount, originalError: String(error) },
+      "Share amount must be a valid numeric string (e.g., '1000', '1000.50')"
+    );
+  }
 
   const withdrawalFee = amount.times(0.0005); // 0.05% withdrawal fee
   const networkFee = new Big(BASE_FEE).times(2.8); // ~2.8x for withdrawal
