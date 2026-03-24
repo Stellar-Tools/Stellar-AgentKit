@@ -9,9 +9,17 @@ export async function listClaimableBalances(publicKey: string) {
   let response = await server.claimableBalances().claimant(publicKey).call();
   let allBalances = [...response.records];
 
+  // Sayfalama (Pagination) döngüsü: Tüm kayıtları çeker
   while (response.records.length > 0) {
-    response = await response.next();
-    allBalances.push(...response.records);
+    try {
+      response = await response.next();
+      if (response.records.length > 0) {
+        allBalances.push(...response.records);
+      }
+    } catch (e) {
+      // Daha fazla sayfa yoksa döngüden çık
+      break;
+    }
   }
 
   return allBalances.map((r: any) => ({
@@ -25,8 +33,12 @@ export async function listClaimableBalances(publicKey: string) {
 export async function claimBalance(publicKey: string, balanceId?: string) {
   const server = getServer();
   const account = await server.loadAccount(publicKey);
+
+  // Hata veren 'fee' kısmı string'e çevrildi ve yapı düzeltildi
+  const baseFee = await server.fetchBaseFee();
+
   const transaction = new TransactionBuilder(account, {
-    fee: await server.fetchBaseFee(),
+    fee: baseFee.toString(), // Sayı olan fee değerini string yaparak hatayı çözdük
     networkPassphrase: process.env.STELLAR_NETWORK === "PUBLIC" ? Networks.PUBLIC : Networks.TESTNET,
   });
 
@@ -35,7 +47,7 @@ export async function claimBalance(publicKey: string, balanceId?: string) {
   } else {
     const balances = await listClaimableBalances(publicKey);
     if (balances.length === 0) throw new Error("No claimable balances found.");
-    
+
     balances.forEach((b: any) => {
       transaction.addOperation(Operation.claimClaimableBalance({ balanceId: b.id }));
     });

@@ -31,6 +31,7 @@ export const StellarLiquidityContractTool = new DynamicStructuredTool({
     inMax: z.string().optional(), // For swap
     shareAmount: z.string().optional(), // For withdraw
   }),
+  // Buradaki parametreye ': any' ekleyerek "unknown" hatasını çözdük
   func: async ({
     action,
     to,
@@ -42,7 +43,7 @@ export const StellarLiquidityContractTool = new DynamicStructuredTool({
     out,
     inMax,
     shareAmount,
-  }) => {
+  }: any) => {
     try {
       switch (action) {
         case "get_share_id": {
@@ -54,13 +55,13 @@ export const StellarLiquidityContractTool = new DynamicStructuredTool({
             throw new Error("to, desiredA, minA, desiredB, and minB are required for deposit");
           }
           const result = await deposit(STELLAR_PUBLIC_KEY, to, desiredA, minA, desiredB, minB);
-          return result ??`Deposited successfully to ${to}.`;
+          return result ?? `Deposited successfully to ${to}.`;
         }
         case "swap": {
           if (!to || buyA === undefined || !out || !inMax) {
             throw new Error("to, buyA, out, and inMax are required for swap");
           }
-          const result=await swap(STELLAR_PUBLIC_KEY, to, buyA, out, inMax);
+          const result = await swap(STELLAR_PUBLIC_KEY, to, buyA, out, inMax);
           return result ?? `Swapped successfully to ${to}.`;
         }
         case "withdraw": {

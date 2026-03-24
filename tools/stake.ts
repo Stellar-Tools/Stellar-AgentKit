@@ -26,7 +26,8 @@ export const StellarContractTool = new DynamicStructuredTool({
     amount: z.number().optional(), // For stake/unstake
     userAddress: z.string().optional(), // For get_stake
   }),
-  func: async ({ action, tokenAddress, rewardRate, amount, userAddress }) => {
+  // func parametresine ': any' ekleyerek tip hatasını giderdik
+  func: async ({ action, tokenAddress, rewardRate, amount, userAddress }: any) => {
     try {
       switch (action) {
         case "initialize": {
@@ -75,5 +76,3 @@ export const StellarContractTool = new DynamicStructuredTool({
     }
   },
 });
-
-
