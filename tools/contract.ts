@@ -31,10 +31,9 @@ type Input = z.infer<typeof schema>;
 
 export const StellarLiquidityContractTool = new DynamicStructuredTool({
   name: "stellar_liquidity_contract_tool",
-  description: "Interact with a liquidity contract on Stellar Soroban",
-
+  description:
+    "Interact with a liquidity contract on Stellar Soroban: getShareId, deposit, swap, withdraw, getReserves.",
   schema,
-
   func: async (input: Input) => {
     const publicKey = process.env.STELLAR_PUBLIC_KEY;
 
@@ -62,7 +61,7 @@ export const StellarLiquidityContractTool = new DynamicStructuredTool({
             throw new Error("Missing deposit parameters");
           }
 
-          await deposit(
+          const result = await deposit(
             publicKey,
             input.to,
             input.desiredA,
@@ -71,7 +70,7 @@ export const StellarLiquidityContractTool = new DynamicStructuredTool({
             input.minB
           );
 
-          return `Deposited successfully to ${input.to}`;
+          return result ?? `Deposited successfully to ${input.to}.`;
         }
 
         case "swap": {
@@ -84,7 +83,7 @@ export const StellarLiquidityContractTool = new DynamicStructuredTool({
             throw new Error("Missing swap parameters");
           }
 
-          await swap(
+          const result = await swap(
             publicKey,
             input.to,
             input.buyA,
@@ -92,7 +91,7 @@ export const StellarLiquidityContractTool = new DynamicStructuredTool({
             input.inMax
           );
 
-          return `Swapped successfully to ${input.to}`;
+          return result ?? `Swapped successfully to ${input.to}.`;
         }
 
         case "withdraw": {
@@ -114,8 +113,8 @@ export const StellarLiquidityContractTool = new DynamicStructuredTool({
           );
 
           return result
-            ? `Withdraw successful: ${JSON.stringify(result)}`
-            : "Withdraw returned no result";
+            ? `Withdrawn successfully to ${input.to}: ${JSON.stringify(result)}`
+            : "Withdraw failed or returned no value.";
         }
 
         case "get_reserves": {
@@ -123,7 +122,7 @@ export const StellarLiquidityContractTool = new DynamicStructuredTool({
 
           return result
             ? `Reserves: ${JSON.stringify(result)}`
-            : "No reserves found";
+            : "No reserves found.";
         }
 
         default:

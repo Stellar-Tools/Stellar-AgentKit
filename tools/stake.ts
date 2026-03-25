@@ -28,9 +28,7 @@ export const StellarContractTool = new DynamicStructuredTool({
   name: "stellar_contract_tool",
   description:
     "Interact with a staking contract on Stellar Soroban: initialize, stake, unstake, claim rewards, or get stake.",
-
   schema,
-
   func: async (input: Input) => {
     const publicKey = process.env.STELLAR_PUBLIC_KEY;
 
