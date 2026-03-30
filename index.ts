@@ -9,12 +9,32 @@ import {
   LaunchTokenResult 
 } from "./agent";
 
-export { 
+export {
   AgentClient,
   AgentConfig,
   LaunchTokenParams,
   LaunchTokenResult
 };
+
+// Router exports
+export { SwapRouter } from "./router/router";
+export { PoolRegistry } from "./router/registry";
+export { TokenGraph } from "./router/graph";
+export { SoroswapAdapter } from "./router/adapters/soroswap";
+export { PhoenixAdapter } from "./router/adapters/phoenix";
+export { SdexAdapter } from "./router/adapters/sdex";
+export { getNetworkConfig, MAINNET_CONFIG, TESTNET_CONFIG } from "./router/config";
+export type {
+  DexAdapter,
+  Pool,
+  Quote,
+  Route,
+  RouteLeg,
+  SwapParams,
+  SwapResult,
+  NetworkConfig,
+} from "./router/types";
+
 export const stellarTools = [
   bridgeTokenTool,
   StellarLiquidityContractTool,

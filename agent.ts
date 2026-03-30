@@ -6,6 +6,12 @@ import {
   getShareId as contractGetShareId,
 } from "./lib/contract";
 import { bridgeTokenTool } from "./tools/bridge";
+import { SwapRouter } from "./router/router";
+import { SoroswapAdapter } from "./router/adapters/soroswap";
+import { PhoenixAdapter } from "./router/adapters/phoenix";
+import { SdexAdapter } from "./router/adapters/sdex";
+import { getNetworkConfig } from "./router/config";
+import type { SwapParams, SwapResult, Route } from "./router/types";
 import {
   Server,
   Keypair,
@@ -88,6 +94,8 @@ export class AgentClient {
 
   /**
    * Perform a swap on the Stellar network.
+   * Supports both direct contract swaps (backward-compatible) and routed swaps
+   * via strategy: "best-route".
    * @param params Swap parameters
    */
   async swap(params: {
@@ -95,14 +103,83 @@ export class AgentClient {
     buyA: boolean;
     out: string;
     inMax: string;
-  }) {
+  } | SwapParams): Promise<any> {
+    if ("strategy" in params && params.strategy === "best-route") {
+      return this.routedSwap(params as SwapParams);
+    }
+
+    const directParams = params as { to: string; buyA: boolean; out: string; inMax: string };
     return await contractSwap(
       this.publicKey,
-      params.to,
-      params.buyA,
-      params.out,
-      params.inMax
+      directParams.to,
+      directParams.buyA,
+      directParams.out,
+      directParams.inMax
     );
+  }
+
+  private async routedSwap(params: SwapParams): Promise<SwapResult> {
+    const router = this.getRouter();
+    const amountIn = BigInt(params.amount);
+    const maxHops = params.maxHops ?? 3;
+
+    const route = await router.findBestRoute(
+      params.tokenIn,
+      params.tokenOut,
+      amountIn,
+      maxHops
+    );
+
+    if (!route) {
+      throw new Error(
+        `No route found from ${params.tokenIn} to ${params.tokenOut}`
+      );
+    }
+
+    const txHash = await router.executeRoute(
+      route,
+      params.slippage,
+      this.publicKey
+    );
+
+    return {
+      txHash,
+      route: {
+        path: [params.tokenIn, ...route.path.map((leg) => leg.tokenOut)],
+        dexes: route.path.map((leg) => leg.pool.dex),
+        amountIn: params.amount,
+        amountOut: route.totalAmountOut.toString(),
+        priceImpact: route.totalPriceImpact,
+      },
+    };
+  }
+
+  async getSwapRoute(params: {
+    tokenIn: string;
+    tokenOut: string;
+    amount: string;
+    maxHops?: number;
+  }): Promise<Route | null> {
+    const router = this.getRouter();
+    return router.findBestRoute(
+      params.tokenIn,
+      params.tokenOut,
+      BigInt(params.amount),
+      params.maxHops ?? 3
+    );
+  }
+
+  private _router: SwapRouter | null = null;
+
+  private getRouter(): SwapRouter {
+    if (!this._router) {
+      const networkConfig = getNetworkConfig(this.network);
+      this._router = new SwapRouter(networkConfig);
+      this._router.registerAdapter(new SoroswapAdapter(networkConfig));
+      this._router.registerAdapter(new PhoenixAdapter(networkConfig));
+      this._router.registerAdapter(new SdexAdapter(networkConfig));
+    }
+    return this._router;
   }
 
   /**

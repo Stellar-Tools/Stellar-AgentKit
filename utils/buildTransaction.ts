@@ -21,7 +21,7 @@ interface BuildTransactionConfig {
 /**
  * Operation type for transaction building
  */
-type OperationType = "swap" | "lp" | "bridge" | "stake";
+type OperationType = "swap" | "lp" | "bridge" | "stake" | "route";
 
 /**
  * Parameters for building a Soroban contract operation
@@ -141,6 +141,8 @@ function getDefaultTimeout(operationType: OperationType): number {
     case "bridge":
       return 300;
     case "stake":
+      return 300;
+    case "route":
       return 300;
     default:
       const _exhaustive: never = operationType;

@@ -1,5 +1,6 @@
 import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
+import { AgentClient } from "../agent";
 import {
   getShareId,
   deposit,
@@ -20,7 +21,7 @@ export const StellarLiquidityContractTool = new DynamicStructuredTool({
   description:
     "Interact with a liquidity contract on Stellar Soroban: getShareId, deposit, swap, withdraw, getReserves.",
   schema: z.object({
-    action: z.enum(["get_share_id", "deposit", "swap", "withdraw", "get_reserves"]),
+    action: z.enum(["get_share_id", "deposit", "swap", "withdraw", "get_reserves", "routed_swap"]),
     to: z.string().optional(), // For deposit, swap, withdraw
     desiredA: z.string().optional(), // For deposit
     minA: z.string().optional(), // For deposit, withdraw
@@ -30,6 +31,11 @@ export const StellarLiquidityContractTool = new DynamicStructuredTool({
     out: z.string().optional(), // For swap
     inMax: z.string().optional(), // For swap
     shareAmount: z.string().optional(), // For withdraw
+    tokenIn: z.string().optional(),
+    tokenOut: z.string().optional(),
+    amount: z.string().optional(),
+    slippage: z.number().optional(),
+    maxHops: z.number().optional(),
   }),
   func: async (input: any) => {
     const {
@@ -78,6 +84,24 @@ export const StellarLiquidityContractTool = new DynamicStructuredTool({
           return result
             ? `Reserves: ${JSON.stringify(result)}`
             : "No reserves found.";
+        }
+        case "routed_swap": {
+          if (!input.tokenIn || !input.tokenOut || !input.amount) {
+            throw new Error("tokenIn, tokenOut, and amount are required for routed_swap");
+          }
+          const agent = new AgentClient({
+            network: "testnet",
+            publicKey: STELLAR_PUBLIC_KEY,
+          });
+          const result = await agent.swap({
+            tokenIn: input.tokenIn,
+            tokenOut: input.tokenOut,
+            amount: input.amount,
+            slippage: input.slippage ?? 0.5,
+            strategy: "best-route" as const,
+            maxHops: input.maxHops ?? 3,
+          });
+          return `Routed swap complete: ${JSON.stringify(result)}`;
         }
         default:
           throw new Error("Unsupported action");
