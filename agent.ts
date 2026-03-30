@@ -6,6 +6,7 @@ import {
   getShareId as contractGetShareId,
 } from "./lib/contract";
 import { bridgeTokenTool } from "./tools/bridge";
+import { stellarGetBalanceTool, stellarGetAllBalancesTool } from "./tools/balance";
 import {
   Server,
   Keypair,
@@ -128,6 +129,26 @@ export class AgentClient {
           ? "stellar-mainnet"
           : "stellar-testnet",
     });
+  }
+
+  /**
+   * Get the balance of an account for XLM or a specific asset.
+   * @param params Balance parameters
+   */
+  async getBalance(params: {
+    address: string;
+    assetCode?: string;
+    assetIssuer?: string;
+  }) {
+    return await stellarGetBalanceTool.func(params);
+  }
+
+  /**
+   * Get all asset balances for an account.
+   * @param address The Stellar public key
+   */
+  async getAllBalances(address: string) {
+    return await stellarGetAllBalancesTool.func({ address });
   }
 
   /**
