@@ -8,18 +8,37 @@ export const stellarGetBalanceTool = new DynamicStructuredTool({
   schema: z.object({
     address: z.string().describe("The Stellar public key (G...) to check balance for"),
     assetCode: z.string().optional().describe("The asset code (e.g., 'USDC', 'XLM'). Defaults to 'XLM'."),
-    assetIssuer: z.string().optional().describe("The asset issuer address. Required for non-XLM assets (except if it is a well-known asset code, but recommended to provide)."),
+    assetIssuer: z.string().optional().describe("The asset issuer address. Required for non-XLM assets to avoid ambiguity."),
+    rpcUrl: z.string().optional().describe("Optional Horizon RPC URL to use."),
+    network: z.string().optional().describe("Optional network name ('mainnet' or 'testnet')."),
   }),
-  func: async ({ address, assetCode = "XLM", assetIssuer }: { address: string; assetCode?: string; assetIssuer?: string }) => {
+  func: async ({ 
+    address, 
+    assetCode = "XLM", 
+    assetIssuer, 
+    rpcUrl, 
+    network 
+  }: { 
+    address: string; 
+    assetCode?: string; 
+    assetIssuer?: string;
+    rpcUrl?: string;
+    network?: string;
+  }) => {
     try {
       if (!StrKey.isValidEd25519PublicKey(address)) {
         throw new Error("Invalid Stellar address.");
       }
 
-      const network = typeof process !== 'undefined' ? process.env.STELLAR_NETWORK || "testnet" : "testnet";
-      const horizonUrl = network === "mainnet" 
-        ? "https://horizon.stellar.org" 
-        : "https://horizon-testnet.stellar.org";
+      const envNetwork = typeof process !== 'undefined' ? process.env.STELLAR_NETWORK || "testnet" : "testnet";
+      const actualNetwork = (network || envNetwork).toLowerCase();
+      
+      let horizonUrl = rpcUrl;
+      if (!horizonUrl) {
+        horizonUrl = actualNetwork.includes("mainnet")
+          ? "https://horizon.stellar.org" 
+          : "https://horizon-testnet.stellar.org";
+      }
       
       const server = new Horizon.Server(horizonUrl);
       const account = await server.loadAccount(address);
@@ -27,12 +46,14 @@ export const stellarGetBalanceTool = new DynamicStructuredTool({
       const balances = account.balances;
       
       if (assetCode.toUpperCase() === "XLM") {
-        const nativeBalance = balances.find((b: Horizon.BalanceLine) => b.asset_type === "native");
+        const nativeBalance = balances.find((b: any) => b.asset_type === "native");
         return nativeBalance ? `Balance: ${nativeBalance.balance} XLM` : "Balance: 0 XLM";
       }
 
-      const assetBalance = balances.find((b: Horizon.BalanceLine) => {
-        if (b.asset_type === "native") return false;
+      // For non-XLM assets, we should ideally have an issuer to avoid ambiguity.
+      // If not provided, we check if there's exactly one asset with that code.
+      const assetBalance = balances.find((b: any) => {
+        if (b.asset_type === "native" || b.asset_type === "liquidity_pool_shares") return false;
         return b.asset_code === assetCode && (!assetIssuer || b.asset_issuer === assetIssuer);
       });
 
@@ -40,7 +61,20 @@ export const stellarGetBalanceTool = new DynamicStructuredTool({
         return `Balance: 0 ${assetCode}${assetIssuer ? ` (${assetIssuer})` : ""}`;
       }
 
-      return `Balance: ${assetBalance.balance} ${assetCode}${assetIssuer ? ` (${assetIssuer})` : ""}`;
+      // Check for ambiguity if assetIssuer was omitted
+      if (!assetIssuer) {
+        const matches = balances.filter((b: any) => {
+          if (b.asset_type === "native" || b.asset_type === "liquidity_pool_shares") return false;
+          return b.asset_code === assetCode;
+        });
+
+        if (matches.length > 1) {
+          return `Ambiguity detected: Multiple assets found with code '${assetCode}'. Please specify the 'assetIssuer' to get the correct balance. Found issuers: ${matches.map((m: any) => m.asset_issuer).join(", ")}`;
+        }
+      }
+
+      const line = assetBalance as any;
+      return `Balance: ${line.balance} ${line.asset_code} (${line.asset_issuer})`;
     } catch (error: any) {
       return `Failed to fetch balance: ${error.message}`;
     }
@@ -52,26 +86,36 @@ export const stellarGetAllBalancesTool = new DynamicStructuredTool({
   description: "Get all asset balances for a Stellar account.",
   schema: z.object({
     address: z.string().describe("The Stellar public key (G...) to check balances for"),
+    rpcUrl: z.string().optional().describe("Optional Horizon RPC URL to use."),
+    network: z.string().optional().describe("Optional network name ('mainnet' or 'testnet')."),
   }),
-  func: async ({ address }: { address: string }) => {
+  func: async ({ address, rpcUrl, network }: { address: string; rpcUrl?: string; network?: string }) => {
     try {
       if (!StrKey.isValidEd25519PublicKey(address)) {
         throw new Error("Invalid Stellar address.");
       }
 
-      const network = typeof process !== 'undefined' ? process.env.STELLAR_NETWORK || "testnet" : "testnet";
-      const horizonUrl = network === "mainnet" 
-        ? "https://horizon.stellar.org" 
-        : "https://horizon-testnet.stellar.org";
+      const envNetwork = typeof process !== 'undefined' ? process.env.STELLAR_NETWORK || "testnet" : "testnet";
+      const actualNetwork = (network || envNetwork).toLowerCase();
+      
+      let horizonUrl = rpcUrl;
+      if (!horizonUrl) {
+        horizonUrl = actualNetwork.includes("mainnet")
+          ? "https://horizon.stellar.org" 
+          : "https://horizon-testnet.stellar.org";
+      }
       
       const server = new Horizon.Server(horizonUrl);
       const account = await server.loadAccount(address);
 
-      const balances = account.balances.map((b: Horizon.BalanceLine) => {
+      const balances = account.balances.map((b: any) => {
         if (b.asset_type === "native") {
           return `XLM: ${b.balance}`;
         }
-        return `${(b as Horizon.BalanceLineAsset).asset_code} (${(b as Horizon.BalanceLineAsset).asset_issuer}): ${b.balance}`;
+        if (b.asset_type === "liquidity_pool_shares") {
+          return `LP Share (${b.liquidity_pool_id}): ${b.balance}`;
+        }
+        return `${b.asset_code} (${b.asset_issuer}): ${b.balance}`;
       });
 
       if (balances.length === 0) {

@@ -141,7 +141,11 @@ export class AgentClient {
     assetCode?: string;
     assetIssuer?: string;
   }) {
-    return await stellarGetBalanceTool.func(params);
+    return await stellarGetBalanceTool.func({
+      ...params,
+      rpcUrl: this.rpcUrl,
+      network: this.network
+    });
   }
 
   /**
@@ -149,7 +153,11 @@ export class AgentClient {
    * @param address The Stellar public key
    */
   async getAllBalances(address: string) {
-    return await stellarGetAllBalancesTool.func({ address });
+    return await stellarGetAllBalancesTool.func({ 
+      address,
+      rpcUrl: this.rpcUrl,
+      network: this.network
+    });
   }
 
   /**
