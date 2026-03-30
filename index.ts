@@ -3,6 +3,7 @@ import { StellarLiquidityContractTool } from "./tools/contract";
 import { StellarContractTool } from "./tools/stake";
 import { stellarSendPaymentTool } from "./tools/stellar";
 import { stellarGetBalanceTool, stellarGetAllBalancesTool } from "./tools/balance";
+import { stellarGenericSorobanCallTool } from "./tools/soroban";
 import { 
   AgentClient, 
   AgentConfig,
@@ -22,5 +23,6 @@ export const stellarTools = [
   StellarContractTool,
   stellarSendPaymentTool,
   stellarGetBalanceTool,
-  stellarGetAllBalancesTool
+  stellarGetAllBalancesTool,
+  stellarGenericSorobanCallTool
 ];

@@ -7,6 +7,7 @@ import {
 } from "./lib/contract";
 import { bridgeTokenTool } from "./tools/bridge";
 import { stellarGetBalanceTool, stellarGetAllBalancesTool } from "./tools/balance";
+import { stellarGenericSorobanCallTool } from "./tools/soroban";
 import {
   Server,
   Keypair,
@@ -149,6 +150,30 @@ export class AgentClient {
    */
   async getAllBalances(address: string) {
     return await stellarGetAllBalancesTool.func({ address });
+  }
+
+  /**
+   * Call any Soroban smart contract function
+   * @param contractId The contract ID (address) to call
+   * @param functionName The name of the function to call
+   * @param args List of arguments for the function call
+   * @param operationType The type of operation for building the transaction (default: "other")
+   * @returns The parsed result of the contract call
+   */
+  async sorobanCall(
+    contractId: string,
+    functionName: string,
+    args: any[] = [],
+    operationType: string = "other"
+  ) {
+    const caller = this.publicKey;
+    return await stellarGenericSorobanCallTool.func({
+      caller,
+      contractId,
+      functionName,
+      args,
+      operationType: operationType as any,
+    });
   }
 
   /**
