@@ -25,7 +25,19 @@ const privateKey = process.env.STELLAR_PRIVATE_KEY as string;
 
 type StellarNetwork = "stellar-testnet" | "stellar-mainnet";
 
-// 34. Satır ve Sonrasındaki Hatalı Bölüm Düzeltildi:
+/**
+ * Supported target EVM chains for bridging from Stellar.
+ * Maps user-facing chain names to Allbridge ChainSymbol values.
+ */
+export type TargetChain = "ethereum" | "polygon" | "arbitrum" | "base";
+
+const TARGET_CHAIN_MAP: Record<TargetChain, ChainSymbol> = {
+  ethereum: ChainSymbol.ETH,
+  polygon: ChainSymbol.POL,
+  arbitrum: ChainSymbol.ARB,
+  base: ChainSymbol.BAS,
+};
+
 const STELLAR_NETWORK_CONFIG: Record<StellarNetwork, { networkPassphrase: string }> = {
   "stellar-testnet": {
     networkPassphrase: Networks.TESTNET,
@@ -47,16 +59,22 @@ export const bridgeTokenTool = new DynamicStructuredTool({
       .enum(["stellar-testnet", "stellar-mainnet"])
       .default("stellar-testnet")
       .describe("Source Stellar network"),
+    targetChain: z
+      .enum(["ethereum", "polygon", "arbitrum", "base"])
+      .default("ethereum")
+      .describe("The destination EVM chain"),
   }),
 
   func: async ({
     amount,
     toAddress,
     fromNetwork,
+    targetChain,
   }: {
     amount: string;
     toAddress: string;
     fromNetwork: StellarNetwork;
+    targetChain: TargetChain;
   }) => {
     // Mainnet safeguard
     if (
@@ -75,13 +93,16 @@ export const bridgeTokenTool = new DynamicStructuredTool({
 
     const chainDetailsMap = await sdk.chainDetailsMap();
 
+    // Destination chain symbol dynamic selection
+    const destinationChainSymbol = TARGET_CHAIN_MAP[targetChain];
+
     const sourceToken = ensure(
       chainDetailsMap[ChainSymbol.SRB].tokens.find(
         (t) => t.symbol === "USDC"
       )
     );
     const destinationToken = ensure(
-      chainDetailsMap[ChainSymbol.ETH].tokens.find(
+      chainDetailsMap[destinationChainSymbol].tokens.find(
         (t) => t.symbol === "USDC"
       )
     );
