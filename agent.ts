@@ -5,9 +5,9 @@ import {
   getReserves as contractGetReserves,
   getShareId as contractGetShareId,
 } from "./lib/contract";
-import { bridgeTokenTool } from "./tools/bridge";
+import { bridgeTokenTool, TargetChain } from "./tools/bridge";
 import {
-  Server,
+  Horizon,
   Keypair,
   Asset,
   TransactionBuilder,
@@ -15,6 +15,8 @@ import {
   Networks,
   BASE_FEE
 } from "@stellar/stellar-sdk";
+
+const { Server } = Horizon;
 
 export interface AgentConfig {
   network: "testnet" | "mainnet";
@@ -106,23 +108,29 @@ export class AgentClient {
   }
 
   /**
-   * Bridge tokens from Stellar to EVM compatible chains.
-   * 
+   * Bridge USDC from Stellar to an EVM-compatible chain.
+   *
    * ⚠️ IMPORTANT: Mainnet bridging requires BOTH:
    * 1. AgentClient initialized with allowMainnet: true
    * 2. ALLOW_MAINNET_BRIDGE=true in your .env file
-   * 
-   * This dual-safeguard approach prevents accidental mainnet bridging.
-   * 
+   *
+   * Supported target chains: "ethereum" | "polygon" | "arbitrum" | "base"
+   *
+   * @example
+   * await agent.bridge({ amount: "100", toAddress: "0x...", targetChain: "polygon" });
+   *
    * @param params Bridge parameters
-   * @returns Bridge transaction result with status, hash, and network
+   * @returns Bridge transaction result with status, hash, network, and targetChain
    */
   async bridge(params: {
     amount: string;
     toAddress: string;
+    targetChain?: TargetChain;
   }) {
     return await bridgeTokenTool.func({
-      ...params,
+      amount: params.amount,
+      toAddress: params.toAddress,
+      targetChain: params.targetChain ?? "ethereum",
       fromNetwork:
         this.network === "mainnet"
           ? "stellar-mainnet"
@@ -236,8 +244,8 @@ export class AgentClient {
       const distributorPublicKey = distributorKeypair.publicKey();
 
       // Connect to Stellar network
-      const server = new Server(this.rpcUrl);
-      const networkPassphrase = this.network === "mainnet" ? Networks.PUBLIC : Networks.TESTNET;
+      const server = new Horizon.Server(this.rpcUrl);
+      const networkPassphrase = Networks.TESTNET;
 
       // Step 1: Load or create issuer account
       let issuerAccount;
@@ -349,15 +357,15 @@ export class AgentClient {
    * @returns true if trustline exists, false otherwise
    */
   private async checkTrustlineExists(
-    server: Server, 
+    server: Horizon.Server,
     accountPublicKey: string, 
     asset: Asset
   ): Promise<boolean> {
     try {
       const account = await server.loadAccount(accountPublicKey);
       
-      return account.balances.some(balance => {
-        if (balance.asset_type === 'native') return false;
+      return account.balances.some((balance: Horizon.HorizonApi.BalanceLine) => {
+        if (balance.asset_type === 'native' || balance.asset_type === 'liquidity_pool_shares') return false;
         
         return (
           balance.asset_code === asset.code &&
@@ -386,7 +394,7 @@ export class AgentClient {
    * @returns Transaction hash of the trustline creation
    */
   private async createTrustline(
-    server: Server,
+    server: Horizon.Server,
     accountKeypair: Keypair,
     asset: Asset,
     networkPassphrase: string
@@ -436,7 +444,7 @@ export class AgentClient {
    * @returns Transaction hash of the locking operation
    */
   private async lockIssuerAccount(
-    server: Server,
+    server: Horizon.Server,
     issuerKeypair: Keypair,
     networkPassphrase: string
   ): Promise<{ hash: string }> {
