@@ -297,6 +297,25 @@ const shareId = await agent.lp.getShareId();
 
 ---
 
+## 🚨 Error Handling
+
+All transaction methods (`swap`, `bridge`, `lp.*`) may throw errors with context. When the SDK uses **AgentKitError**, you get a stable `code`, human-readable `message`, and optional `context` (e.g. `address`, `hash`, `network`). Use `isAgentKitError(e)` to detect and `e.code` to handle specific cases. See `docs/api.md` for the full error code reference.
+
+---
+
+## 🪙 Token Issuance (launchToken)
+
+Create a classic Stellar asset: issuer account, trustline, and initial mint. Use `agent.launchToken()` with `assetCode`, `decimals`, `initialSupply`, and issuer/distributor keys. Mainnet issuance requires `allowMainnetTokenIssuance: true` and `ALLOW_MAINNET_TOKEN_ISSUANCE=true` in `.env`. See `docs/api.md` for parameters and error codes (e.g. `missing_trustline`, `invalid_params`).
+
+---
+
+## 📚 API Reference
+
+- **Summary:** [docs/api.md](docs/api.md) — AgentClient methods, parameters, returns.
+- **Generated docs:** Run `pnpm run docs:generate` to build TypeDoc output.
+
+---
+
 ## 🌐 Supported Networks
 
 - **Testnet** - Full support, no restrictions, safe for development
@@ -309,13 +328,12 @@ const shareId = await agent.lp.getShareId();
 ## 🧪 Testing
 
 ```bash
-# Run test suite
-node test/bridge-tests.mjs
-
-# View test results
-# ✅ 20/20 tests passed
-# ✅ 100% success rate
+pnpm install
+pnpm run build
+pnpm run test
 ```
+
+Set `STELLAR_PUBLIC_KEY` (e.g. a testnet key or any valid-format `G...` address) so the SDK loads; CI sets a dummy value for validation-only tests.
 
 ---
 
