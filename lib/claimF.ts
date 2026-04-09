@@ -48,7 +48,13 @@ export async function claimBalance(publicKey: string, balanceId?: string) {
     const balances = await listClaimableBalances(publicKey);
     if (balances.length === 0) throw new Error("No claimable balances found.");
 
-    balances.forEach((b: any) => {
+    /**
+     * KRİTİK DÜZELTME: Stellar ağı bir işlemde en fazla 100 operasyona izin verir.
+     * Güvenlik amacıyla tek seferde en fazla 50 bakiyeyi çekiyoruz (slice(0, 50)).
+     */
+    const limitedBalances = balances.slice(0, 50);
+
+    limitedBalances.forEach((b: any) => {
       transaction.addOperation(Operation.claimClaimableBalance({ balanceId: b.id }));
     });
   }
