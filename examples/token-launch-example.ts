@@ -59,7 +59,7 @@ async function exampleTokenLaunch() {
 
   } catch (error) {
     console.error("\n❌ Token launch failed:");
-    console.error((error as Error).message);
+    console.error(error instanceof Error ? error.message : String(error));
   }
 }
 
@@ -97,7 +97,7 @@ async function exampleTokenLaunchWithLocking() {
 
   } catch (error) {
     console.error("\n❌ Token launch with locking failed:");
-    console.error((error as Error).message);
+    console.error(error instanceof Error ? error.message : String(error));
   }
 }
 

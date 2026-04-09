@@ -79,7 +79,7 @@ describe('Bridge Tool - Multi-Chain Support', () => {
 
     it('should block mainnet when ALLOW_MAINNET_BRIDGE is false', () => {
       const fromNetwork: StellarNetwork = "stellar-mainnet";
-      const allowMainnetBridge: string = "false";
+      const allowMainnetBridge: string | undefined = "false";
       
       const shouldBlock = fromNetwork === "stellar-mainnet" && allowMainnetBridge !== "true";
       expect(shouldBlock).toBe(true);

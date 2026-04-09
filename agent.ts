@@ -5,7 +5,16 @@ import {
   getReserves as contractGetReserves,
   getShareId as contractGetShareId,
 } from "./lib/contract";
-import { bridgeTokenTool, TargetChain } from "./tools/bridge";
+import {
+  quoteSwap as quoteDexSwap,
+  swapBestRoute as executeBestRouteSwap,
+  type StellarAssetInput,
+  type QuoteSwapParams,
+  type RouteQuote,
+  type SwapBestRouteParams,
+  type SwapBestRouteResult,
+} from "./lib/dex";
+import { bridgeTokenTool } from "./tools/bridge";
 import {
   Horizon,
   Keypair,
@@ -50,6 +59,14 @@ export interface LaunchTokenResult {
   distributorPublicKey: string;
   issuerLocked: boolean;
 }
+
+export type {
+  StellarAssetInput,
+  QuoteSwapParams,
+  RouteQuote,
+  SwapBestRouteParams,
+  SwapBestRouteResult,
+};
 
 export class AgentClient {
   private network: "testnet" | "mainnet";
@@ -180,6 +197,38 @@ export class AgentClient {
 
     getShareId: async () => {
       return await contractGetShareId(this.publicKey);
+    },
+  };
+
+  /**
+   * Stellar Classic DEX routing.
+   *
+   * These methods use Horizon pathfinding and path payment operations, which can
+   * route through the SDEX and built-in liquidity pools.
+   */
+  public dex = {
+    quoteSwap: async (params: QuoteSwapParams): Promise<RouteQuote[]> => {
+      return await quoteDexSwap(
+        {
+          network: this.network,
+          horizonUrl: this.rpcUrl,
+          publicKey: this.publicKey,
+        },
+        params
+      );
+    },
+
+    swapBestRoute: async (
+      params: SwapBestRouteParams
+    ): Promise<SwapBestRouteResult> => {
+      return await executeBestRouteSwap(
+        {
+          network: this.network,
+          horizonUrl: this.rpcUrl,
+          publicKey: this.publicKey,
+        },
+        params
+      );
     },
   };
 

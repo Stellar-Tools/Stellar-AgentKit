@@ -3,10 +3,12 @@ import {
   rpc,
   TransactionBuilder,
   Account,
+  Asset,
   BASE_FEE,
   Networks,
   Transaction,
   Memo,
+  Operation,
 } from "@stellar/stellar-sdk";
 
 /**
@@ -30,6 +32,18 @@ interface SorobanOperationParams {
   contract: Contract;
   functionName: string;
   args?: any[];
+}
+
+interface PathPaymentOperationParams {
+  mode: "strict-send" | "strict-receive";
+  sendAsset: Asset;
+  destAsset: Asset;
+  sendAmount: string;
+  destAmount: string;
+  destination: string;
+  path: Asset[];
+  sendMax?: string;
+  destMin?: string;
 }
 
 /**
@@ -119,6 +133,57 @@ export function buildTransactionFromXDR(
 
   return transaction;
 
+}
+
+export function buildPathPaymentTransaction(
+  sourceAccount: Account,
+  operation: PathPaymentOperationParams,
+  config: BuildTransactionConfig & { networkPassphrase: string }
+): Transaction {
+  const fee = config.fee || BASE_FEE;
+  const timeout = config.timeout !== undefined ? config.timeout : 300;
+  const memo = config.memo ? Memo.text(config.memo) : undefined;
+
+  const builder = new TransactionBuilder(sourceAccount, {
+    fee,
+    networkPassphrase: config.networkPassphrase,
+    memo,
+  });
+
+  if (operation.mode === "strict-send") {
+    if (!operation.destMin) {
+      throw new Error("destMin is required for strict-send path payments");
+    }
+
+    builder.addOperation(
+      Operation.pathPaymentStrictSend({
+        sendAsset: operation.sendAsset,
+        sendAmount: operation.sendAmount,
+        destination: operation.destination,
+        destAsset: operation.destAsset,
+        destMin: operation.destMin,
+        path: operation.path,
+      })
+    );
+  } else {
+    if (!operation.sendMax) {
+      throw new Error("sendMax is required for strict-receive path payments");
+    }
+
+    builder.addOperation(
+      Operation.pathPaymentStrictReceive({
+        sendAsset: operation.sendAsset,
+        sendMax: operation.sendMax,
+        destination: operation.destination,
+        destAsset: operation.destAsset,
+        destAmount: operation.destAmount,
+        path: operation.path,
+      })
+    );
+  }
+
+  builder.setTimeout(timeout);
+  return builder.build();
 }
 
 /**

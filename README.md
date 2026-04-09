@@ -104,7 +104,52 @@ To enable mainnet, set allowMainnet: true in your config.
 
 Perform token swaps on the Stellar network.
 
-### Testnet Swap
+### Best-Route Swaps on Stellar Classic
+
+`agent.dex.*` is the new route-aware swap surface. It uses Horizon pathfinding plus
+Stellar path payment operations, so the chosen route can traverse the SDEX and the
+built-in liquidity pools automatically.
+
+`quoteSwap({ limit })` returns up to `limit` ranked quotes to the caller. Internally,
+the SDK fetches a fixed Horizon candidate window and then returns the top-ranked
+results from that window.
+
+`swapBestRoute()` requires `STELLAR_PRIVATE_KEY` to correspond to the same account
+as the configured `publicKey`.
+
+Implementation details:
+
+- `strict-send` quotes are requested with explicit `destination_assets`, so the SDK asks Horizon for the requested output asset directly instead of discovering generic recipient assets and filtering later.
+- Before quoting issued-asset outputs, the SDK checks that the destination account has the required trustline.
+- Quotes are ranked by best output for `strict-send` and lowest input for `strict-receive`, with shorter paths as the tie-breaker.
+- Execution builds a Stellar Classic path payment, then signs it only if `STELLAR_PRIVATE_KEY` matches the configured source account.
+
+```typescript
+const quotes = await agent.dex.quoteSwap({
+  mode: "strict-send",
+  sendAsset: { code: "USDC", issuer: "G..." },
+  destAsset: { code: "EURC", issuer: "G..." },
+  sendAmount: "25.0000000"
+});
+
+const result = await agent.dex.swapBestRoute({
+  mode: "strict-send",
+  sendAsset: { code: "USDC", issuer: "G..." },
+  destAsset: { code: "EURC", issuer: "G..." },
+  sendAmount: "25.0000000",
+  slippageBps: 100
+});
+```
+
+`quoteSwap()` returns ranked routes with normalized `path`, `sendAmount`,
+`destAmount`, `estimatedPrice`, `hopCount`, and the raw Horizon path object.
+
+`swapBestRoute()` executes the top-ranked route using:
+
+- `PathPaymentStrictSend` for `mode: "strict-send"`
+- `PathPaymentStrictReceive` for `mode: "strict-receive"`
+
+### Legacy Soroban Single-Pool Swap
 
 ```typescript
 import { AgentClient } from "stellar-agentkit";
@@ -122,24 +167,9 @@ await agent.swap({
 });
 ```
 
-### Mainnet Swap
-
-```typescript
-import { AgentClient } from "stellar-agentkit";
-
-const agent = new AgentClient({
-  network: "mainnet",
-  allowMainnet: true, // Required
-  publicKey: process.env.STELLAR_PUBLIC_KEY
-});
-
-await agent.swap({
-  to: "recipient_address",
-  buyA: true,
-  out: "100",
-  inMax: "110"
-});
-```
+This older `agent.swap()` method is a direct Soroban contract call against a
+single configured pool. It is separate from `agent.dex.*` and should not be
+treated as the best-route swap API.
 
 ---
 
@@ -262,6 +292,10 @@ await agent.bridge({ ... });
 
 ## 💧 Liquidity Pool Operations
 
+The existing `agent.lp.*` and `agent.swap()` methods below are the older
+single-pool Soroban contract integrations. They are separate from the new
+Classic DEX route optimizer.
+
 ### Deposit Liquidity
 
 ```typescript
@@ -300,8 +334,9 @@ const shareId = await agent.lp.getShareId();
 ## 🌐 Supported Networks
 
 - **Testnet** - Full support, no restrictions, safe for development
-- **Mainnet** - Full support with dual-safeguard system:
-  - **Swaps & LP operations:** Require `allowMainnet: true` in AgentClient config
+- **Mainnet** - Supported with caveats:
+  - **Classic best-route swaps (`agent.dex.*`):** Require `allowMainnet: true` in `AgentClient`
+  - **Soroban single-pool swap/LP (`agent.swap()`, `agent.lp.*`):** Still wired to testnet-only contract settings
   - **Bridge operations:** Require BOTH `allowMainnet: true` AND `ALLOW_MAINNET_BRIDGE=true` in `.env`
 
 ---

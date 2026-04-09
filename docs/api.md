@@ -66,6 +66,102 @@ await agent.swap({
 
 ---
 
+## 🧭 dex.quoteSwap()
+
+Quotes Stellar Classic swap routes using Horizon path discovery. This can return
+routes that traverse the SDEX and/or Stellar built-in liquidity pools.
+
+The public `limit` controls how many ranked quotes are returned to the caller.
+The SDK may fetch a larger fixed candidate window from Horizon internally before
+ranking and slicing the final response.
+
+#### Parameters
+
+```typescript
+{
+  mode: "strict-send" | "strict-receive";
+  sendAsset: { type: "native" } | { code: string; issuer: string };
+  destAsset: { type: "native" } | { code: string; issuer: string };
+  sendAmount?: string;   // Required for strict-send
+  destAmount?: string;   // Required for strict-receive
+  destination?: string;  // Defaults to the configured public key
+  limit?: number;        // Defaults to 5
+}
+```
+
+#### Returns
+
+```typescript
+Promise<Array<{
+  path: Array<{ type: "native" } | { code: string; issuer: string }>;
+  sendAmount: string;
+  destAmount: string;
+  estimatedPrice: string;
+  hopCount: number;
+  raw: object;
+}>>
+```
+
+#### Example
+
+```typescript
+const quotes = await agent.dex.quoteSwap({
+  mode: "strict-send",
+  sendAsset: { code: "USDC", issuer: "G..." },
+  destAsset: { code: "EURC", issuer: "G..." },
+  sendAmount: "25.0000000"
+});
+```
+
+---
+
+## 🧭 dex.swapBestRoute()
+
+Executes the top-ranked route returned by Stellar Classic pathfinding.
+
+> **Signer requirement:** `STELLAR_PRIVATE_KEY` must correspond to the same
+> account as the configured `publicKey`, or execution fails before submission.
+
+#### Parameters
+
+```typescript
+{
+  mode: "strict-send" | "strict-receive";
+  sendAsset: { type: "native" } | { code: string; issuer: string };
+  destAsset: { type: "native" } | { code: string; issuer: string };
+  sendAmount?: string;   // Required for strict-send
+  destAmount?: string;   // Required for strict-receive
+  destination?: string;  // Defaults to the configured public key
+  slippageBps?: number;  // Defaults to 100
+}
+```
+
+#### Returns
+
+```typescript
+Promise<{
+  hash: string;
+  mode: "strict-send" | "strict-receive";
+  sendAmount: string;
+  destAmount: string;
+  path: Array<{ type: "native" } | { code: string; issuer: string }>;
+}>
+```
+
+#### Example
+
+```typescript
+const result = await agent.dex.swapBestRoute({
+  mode: "strict-receive",
+  sendAsset: { code: "USDC", issuer: "G..." },
+  destAsset: { code: "EURC", issuer: "G..." },
+  destAmount: "20.0000000",
+  slippageBps: 100
+});
+```
+
+---
+
 ## 🌉 bridge()
 
 Performs cross-chain bridge operation from Stellar to EVM compatible chains.
@@ -107,6 +203,9 @@ await agent.bridge({
 ---
 
 ## 💧 Liquidity Pool Methods
+
+These are the existing Soroban single-pool LP helpers. They are separate from
+the new Classic DEX route optimizer under `agent.dex.*`.
 
 ### `lp.deposit()`
 
