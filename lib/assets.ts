@@ -7,7 +7,12 @@ export type StellarAssetInput =
 export function isNativeAssetInput(
   asset: StellarAssetInput
 ): asset is { type: "native" } {
-  return "type" in asset;
+  return (
+    typeof asset === "object" &&
+    asset !== null &&
+    "type" in asset &&
+    asset.type === "native"
+  );
 }
 
 export function assetInputToSdkAsset(asset: StellarAssetInput): Asset {
