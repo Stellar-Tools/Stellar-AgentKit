@@ -8,13 +8,18 @@ import {
 import {
   quoteSwap as quoteDexSwap,
   swapBestRoute as executeBestRouteSwap,
-  type StellarAssetInput,
   type QuoteSwapParams,
   type RouteQuote,
   type SwapBestRouteParams,
   type SwapBestRouteResult,
 } from "./lib/dex";
-import { bridgeTokenTool } from "./tools/bridge";
+import {
+  sendPayment as executePayment,
+  type SendPaymentParams,
+  type SendPaymentResult,
+} from "./lib/payments";
+import type { StellarAssetInput } from "./lib/assets";
+import { bridgeTokenTool, type TargetChain } from "./tools/bridge";
 import {
   Horizon,
   Keypair,
@@ -66,6 +71,8 @@ export type {
   RouteQuote,
   SwapBestRouteParams,
   SwapBestRouteResult,
+  SendPaymentParams,
+  SendPaymentResult,
 };
 
 export class AgentClient {
@@ -231,6 +238,23 @@ export class AgentClient {
       );
     },
   };
+
+  /**
+   * Send native XLM or issued-asset payments on Stellar Classic.
+   *
+   * Native payments automatically fall back to `createAccount` when the destination
+   * does not exist yet, which is useful for first-time account funding flows.
+   */
+  async sendPayment(params: SendPaymentParams): Promise<SendPaymentResult> {
+    return await executePayment(
+      {
+        network: this.network,
+        horizonUrl: this.rpcUrl,
+        publicKey: this.publicKey,
+      },
+      params
+    );
+  }
 
   /**
    * Launch a new token on the Stellar network.

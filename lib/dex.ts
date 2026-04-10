@@ -1,17 +1,17 @@
 import Big from "big.js";
 import {
-  Asset,
   Horizon,
   Networks,
   StrKey,
   TransactionBuilder,
 } from "@stellar/stellar-sdk";
+import {
+  assetInputToHorizonAsset,
+  assetInputToSdkAsset,
+  type StellarAssetInput,
+} from "./assets";
 import { getSigningKeypair, signTransaction } from "./stellar";
 import { buildPathPaymentTransaction } from "../utils/buildTransaction";
-
-export type StellarAssetInput =
-  | { type: "native" }
-  | { code: string; issuer: string };
 
 export type RouteMode = "strict-send" | "strict-receive";
 
@@ -97,25 +97,7 @@ const DEFAULT_LIMIT = 5;
 const DEFAULT_SLIPPAGE_BPS = 100;
 const INTERNAL_FETCH_LIMIT = 20;
 
-export function assetInputToSdkAsset(asset: StellarAssetInput): Asset {
-  if ("type" in asset) {
-    return Asset.native();
-  }
-
-  if (!asset.code || !asset.issuer) {
-    throw new Error("Issued assets require both code and issuer");
-  }
-
-  if (!StrKey.isValidEd25519PublicKey(asset.issuer)) {
-    throw new Error(`Invalid issuer public key: ${asset.issuer}`);
-  }
-
-  return new Asset(asset.code, asset.issuer);
-}
-
-export function assetInputToHorizonAsset(asset: StellarAssetInput): string {
-  return "type" in asset ? "native" : `${asset.code}:${asset.issuer}`;
-}
+export { assetInputToHorizonAsset, assetInputToSdkAsset } from "./assets";
 
 export function normalizePathRecord(record: HorizonPathRecord): RouteQuote {
   const path = record.path.map(horizonAssetToInput);

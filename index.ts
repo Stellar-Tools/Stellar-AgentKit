@@ -8,6 +8,8 @@ import {
   AgentConfig,
   LaunchTokenParams,
   LaunchTokenResult,
+  SendPaymentParams,
+  SendPaymentResult,
 } from "./agent";
 import type {
   StellarAssetInput,
@@ -22,6 +24,8 @@ export {
   AgentConfig,
   LaunchTokenParams,
   LaunchTokenResult,
+  SendPaymentParams,
+  SendPaymentResult,
 };
 
 export type {

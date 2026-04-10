@@ -1,67 +1,94 @@
 import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
-import * as StellarSdk from "stellar-sdk";
-// ... import StellarSdk, getPublicKey, connect, signTransaction, etc. as needed ...
+import { sendPayment } from "../lib/payments";
+import type { StellarAssetInput } from "../lib/assets";
+
+const nativeAssetSchema = z.object({
+  type: z.literal("native"),
+});
+
+const issuedAssetSchema = z.object({
+  code: z.string().min(1).max(12),
+  issuer: z.string().min(1),
+});
+
+const assetSchema = z.union([nativeAssetSchema, issuedAssetSchema]);
 
 export const stellarSendPaymentTool = new DynamicStructuredTool({
   name: "stellar_send_payment",
-  description: "Send a payment on the Stellar testnet. Requires recipient address and amount.",
+  description:
+    "Send native XLM or issued-asset payments on Stellar Classic. " +
+    "Supports optional memos and can fund brand-new accounts with native XLM.",
   schema: z.object({
-    recipient: z.string().describe("The Stellar address to send to"),
-    amount: z.string().describe("The amount of XLM to send (as a string)"),
+    recipient: z.string().describe("The Stellar public key to send to"),
+    amount: z.string().describe("The amount to send as a Stellar amount string"),
+    asset: assetSchema
+      .optional()
+      .describe("Optional asset descriptor. Omit to send native XLM."),
+    memo: z
+      .string()
+      .max(28)
+      .optional()
+      .describe("Optional text memo up to 28 bytes"),
+    network: z
+      .enum(["testnet", "mainnet"])
+      .optional()
+      .describe("Target Stellar network. Defaults to testnet."),
+    horizonUrl: z
+      .string()
+      .url()
+      .optional()
+      .describe("Optional Horizon URL override"),
+    allowMainnet: z
+      .boolean()
+      .optional()
+      .describe("Required when network is mainnet"),
   }),
-  func: async ({ recipient, amount }: { recipient: string; amount: string }) => {
-    try {
-      // Step 1: Validate inputs
-      if (!StellarSdk.StrKey.isValidEd25519PublicKey(recipient)) {
-        throw new Error("Invalid recipient address.");
-      }
-      if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
-        throw new Error("Amount must be a positive number.");
-      }
-
-      // Step 2: Get private key from environment
-      const privateKey = process.env.STELLAR_PRIVATE_KEY as string;
-      if (!privateKey || !StellarSdk.StrKey.isValidEd25519SecretSeed(privateKey)) {
-        throw new Error("Invalid or missing Stellar private key in environment.");
-      }
-      const keypair = StellarSdk.Keypair.fromSecret(privateKey);
-      const sourcePublicKey = keypair.publicKey();
-
-      // Step 3: Create an unsigned transaction
-      const server = new StellarSdk.Horizon.Server("https://horizon-testnet.stellar.org");
-      const account = await server.loadAccount(sourcePublicKey);
-
-      const transaction = new StellarSdk.TransactionBuilder(account, {
-        fee: StellarSdk.BASE_FEE,
-        networkPassphrase: StellarSdk.Networks.TESTNET,
-      })
-        .addOperation(
-          StellarSdk.Operation.payment({
-            destination: recipient,
-            asset: StellarSdk.Asset.native(),
-            amount: amount,
-          })
-        )
-        .setTimeout(300)
-        .build();
-
-      // Step 4: Sign the transaction with the private key
-      transaction.sign(keypair);
-      const signedTxXdr = transaction.toXDR();
-
-      // Step 5: Submit the transaction
-      const tx = new StellarSdk.Transaction(signedTxXdr, StellarSdk.Networks.TESTNET);
-      const response = await server.submitTransaction(tx);
-
-      return `Transaction successful! Hash: ${response.hash}`;
-    } catch (error) {
-      const errorMessage =
-        (error as { response?: { data?: { title?: string } }; message?: string })
-          .response?.data?.title ||
-        (error as Error).message ||
-        "Unknown error occurred";
-      return `Transaction failed: ${errorMessage}`;
+  func: async ({
+    recipient,
+    amount,
+    asset,
+    memo,
+    network,
+    horizonUrl,
+    allowMainnet,
+  }: {
+    recipient: string;
+    amount: string;
+    asset?: StellarAssetInput;
+    memo?: string;
+    network?: "testnet" | "mainnet";
+    horizonUrl?: string;
+    allowMainnet?: boolean;
+  }) => {
+    const selectedNetwork = network ?? "testnet";
+    if (selectedNetwork === "mainnet" && !allowMainnet) {
+      throw new Error("allowMainnet: true is required for mainnet payments");
     }
+
+    const publicKey = process.env.STELLAR_PUBLIC_KEY;
+    if (!publicKey) {
+      throw new Error("Missing STELLAR_PUBLIC_KEY");
+    }
+
+    const result = await sendPayment(
+      {
+        network: selectedNetwork,
+        horizonUrl:
+          horizonUrl ??
+          (selectedNetwork === "mainnet"
+            ? "https://horizon.stellar.org"
+            : "https://horizon-testnet.stellar.org"),
+        publicKey,
+      },
+      {
+        destination: recipient,
+        amount,
+        asset,
+        memo,
+      }
+    );
+
+    return JSON.stringify(result, null, 2);
   },
 });

@@ -17,6 +17,7 @@ multiple operations into a single programmable and extensible toolkit.
 ## ✨ Features
 
 - Token swaps on Stellar
+- Native XLM and issued-asset payments
 - Cross-chain bridging
 - Liquidity pool (LP) deposits & withdrawals
 - Querying pool reserves and share IDs
@@ -170,6 +171,39 @@ await agent.swap({
 This older `agent.swap()` method is a direct Soroban contract call against a
 single configured pool. It is separate from `agent.dex.*` and should not be
 treated as the best-route swap API.
+
+---
+
+## 💸 Send Payments
+
+`agent.sendPayment()` sends either native XLM or issued assets on Stellar
+Classic using the configured Horizon network.
+
+Highlights:
+
+- Supports optional text memos
+- Uses the configured `STELLAR_PRIVATE_KEY` only when it matches the source account
+- Automatically falls back to `createAccount` when funding an unfunded address with native XLM
+- Validates destination trustlines before issued-asset payments
+
+```typescript
+const payment = await agent.sendPayment({
+  destination: "GBRPYHIL2C3Z3QKYLH6N2IYVMZT7B4M4U7CUC3VQ44S2M2XNO4M6JJ74",
+  amount: "25.0000000",
+  memo: "invoice-42"
+});
+
+const usdcPayment = await agent.sendPayment({
+  destination: "GBRPYHIL2C3Z3QKYLH6N2IYVMZT7B4M4U7CUC3VQ44S2M2XNO4M6JJ74",
+  amount: "10.5000000",
+  asset: {
+    code: "USDC",
+    issuer: "G..."
+  }
+});
+```
+
+The `stellar_send_payment` tool exposes the same flow for agent/tooling use.
 
 ---
 
