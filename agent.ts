@@ -14,7 +14,7 @@ import {
   type SwapBestRouteParams,
   type SwapBestRouteResult,
 } from "./lib/dex";
-import { bridgeTokenTool } from "./tools/bridge";
+import { bridgeTokenTool, type TargetChain } from "./tools/bridge";
 import {
   Horizon,
   Keypair,
