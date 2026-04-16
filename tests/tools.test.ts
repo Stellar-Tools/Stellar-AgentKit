@@ -32,7 +32,7 @@ jest.mock("@stellar/stellar-sdk", () => {
       {
         asset_type: "credit_alphanum4",
         asset_code: "USDC",
-        asset_issuer: "TEST_SECRET_DO_NOT_USE",
+        asset_issuer: "mock_value",
         balance: "50.0000000",
         limit: "922337203685.4775807",
         buying_liabilities: "0.0000000",
@@ -47,7 +47,7 @@ jest.mock("@stellar/stellar-sdk", () => {
       fee_charged: { p50: "100", p90: "150", p99: "200" },
     }),
     submitTransaction: jest.fn().mockResolvedValue({
-      hash: "TEST_SECRET_DO_NOT_USE",
+      hash: "mock_value",
       ledger: 12345,
     }),
     strictSendPaths: jest.fn().mockReturnValue({
@@ -95,7 +95,7 @@ jest.mock("@stellar/stellar-sdk", () => {
     },
     Keypair: {
       fromSecret: jest.fn().mockReturnValue({
-        publicKey: () => "TEST_SECRET_DO_NOT_USE",
+        publicKey: () => "mock_value",
         sign: jest.fn(),
       }),
     },
@@ -156,7 +156,7 @@ describe("createGetAccountBalanceTool", () => {
 
   it("should return balances for a valid account", async () => {
     const result = await tool.func({
-      accountId: "TEST_SECRET_DO_NOT_USE",
+      accountId: "mock_value",
       network: "testnet",
       includeZeroBalances: false,
     });
@@ -170,7 +170,7 @@ describe("createGetAccountBalanceTool", () => {
 
   it("should include XLM in results", async () => {
     const result = await tool.func({
-      accountId: "TEST_SECRET_DO_NOT_USE",
+      accountId: "mock_value",
       network: "testnet",
       includeZeroBalances: false,
     });
@@ -183,7 +183,7 @@ describe("createGetAccountBalanceTool", () => {
 
   it("should include USDC trustline", async () => {
     const result = await tool.func({
-      accountId: "TEST_SECRET_DO_NOT_USE",
+      accountId: "mock_value",
       network: "testnet",
       includeZeroBalances: false,
     });
@@ -209,15 +209,15 @@ describe("createPathPaymentStrictSendTool", () => {
 
   it("should execute a basic XLM → USDC payment", async () => {
     const result = await tool.func({
-      sourceSecretKey: "TEST_SECRET_DO_NOT_USE",
+      sourceSecretKey: "mock_value",
       sendAsset: { code: "XLM" },
       sendAmount: "10",
       destAsset: {
         code: "USDC",
-        issuer: "TEST_SECRET_DO_NOT_USE",
+        issuer: "mock_value",
       },
       minDestAmount: "9",
-      destinationAccountId: "TEST_SECRET_DO_NOT_USE",
+      destinationAccountId: "mock_value",
       network: "testnet",
     });
 
@@ -229,15 +229,15 @@ describe("createPathPaymentStrictSendTool", () => {
 
   it("should include explorer URL in result", async () => {
     const result = await tool.func({
-      sourceSecretKey: "TEST_SECRET_DO_NOT_USE",
+      sourceSecretKey: "mock_value",
       sendAsset: { code: "XLM" },
       sendAmount: "5",
       destAsset: {
         code: "USDC",
-        issuer: "TEST_SECRET_DO_NOT_USE",
+        issuer: "mock_value",
       },
       minDestAmount: "4",
-      destinationAccountId: "TEST_SECRET_DO_NOT_USE",
+      destinationAccountId: "mock_value",
       network: "testnet",
     });
 
@@ -260,13 +260,13 @@ describe("createInvokeContractTool", () => {
 
   it("should return simulation result when simulateOnly=true", async () => {
     const result = await tool.func({
-      sourceSecretKey: "TEST_SECRET_DO_NOT_USE",
-      contractId: "TEST_SECRET_DO_NOT_USE",
+      sourceSecretKey: "mock_value",
+      contractId: "mock_value",
       functionName: "get_balance",
       args: [
         {
           type: "address",
-          value: "TEST_SECRET_DO_NOT_USE",
+          value: "mock_value",
         },
       ],
       network: "testnet",
@@ -281,8 +281,8 @@ describe("createInvokeContractTool", () => {
 
   it("should return contractId and functionName in result", async () => {
     const result = await tool.func({
-      sourceSecretKey: "TEST_SECRET_DO_NOT_USE",
-      contractId: "TEST_SECRET_DO_NOT_USE",
+      sourceSecretKey: "mock_value",
+      contractId: "mock_value",
       functionName: "total_supply",
       args: [],
       network: "testnet",
@@ -290,7 +290,7 @@ describe("createInvokeContractTool", () => {
     });
 
     const parsed = JSON.parse(result as string);
-    expect(parsed.contractId).toBe("TEST_SECRET_DO_NOT_USE");
+    expect(parsed.contractId).toBe("mock_value");
     expect(parsed.functionName).toBe("total_supply");
   });
 });
