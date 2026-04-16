@@ -1,6 +1,6 @@
 import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
-import * as StellarSdk from "stellar-sdk";
+import * as StellarSdk from "@stellar/stellar-sdk";
 // ... import StellarSdk, getPublicKey, connect, signTransaction, etc. as needed ...
 
 export const stellarSendPaymentTool = new DynamicStructuredTool({

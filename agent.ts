@@ -68,6 +68,7 @@ export type {
   SwapBestRouteResult,
 };
 
+export type TargetChain = "ethereum" | "polygon" | "arbitrum" | "base";
 export class AgentClient {
   private network: "testnet" | "mainnet";
   private publicKey: string;
@@ -139,6 +140,8 @@ export class AgentClient {
    * @param params Bridge parameters
    * @returns Bridge transaction result with status, hash, network, and targetChain
    */
+  
+
   async bridge(params: {
     amount: string;
     toAddress: string;
@@ -148,10 +151,7 @@ export class AgentClient {
       amount: params.amount,
       toAddress: params.toAddress,
       targetChain: params.targetChain ?? "ethereum",
-      fromNetwork:
-        this.network === "mainnet"
-          ? "stellar-mainnet"
-          : "stellar-testnet",
+      fromNetwork: "stellar-testnet"
     });
   }
 
