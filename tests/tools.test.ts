@@ -32,7 +32,7 @@ jest.mock("@stellar/stellar-sdk", () => {
       {
         asset_type: "credit_alphanum4",
         asset_code: "USDC",
-        asset_issuer: "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+        asset_issuer: "TEST_SECRET_DO_NOT_USE",
         balance: "50.0000000",
         limit: "922337203685.4775807",
         buying_liabilities: "0.0000000",
@@ -47,7 +47,7 @@ jest.mock("@stellar/stellar-sdk", () => {
       fee_charged: { p50: "100", p90: "150", p99: "200" },
     }),
     submitTransaction: jest.fn().mockResolvedValue({
-      hash: "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+      hash: "TEST_SECRET_DO_NOT_USE",
       ledger: 12345,
     }),
     strictSendPaths: jest.fn().mockReturnValue({
@@ -95,7 +95,7 @@ jest.mock("@stellar/stellar-sdk", () => {
     },
     Keypair: {
       fromSecret: jest.fn().mockReturnValue({
-        publicKey: () => "GBVUDZFQ7VMHEJPFDNS7BVTQMXHBDZ2HB2NRVF6SK7EAKPLQH2PQTLR",
+        publicKey: () => "TEST_SECRET_DO_NOT_USE",
         sign: jest.fn(),
       }),
     },
@@ -156,7 +156,7 @@ describe("createGetAccountBalanceTool", () => {
 
   it("should return balances for a valid account", async () => {
     const result = await tool.func({
-      accountId: "GBVUDZFQ7VMHEJPFDNS7BVTQMXHBDZ2HB2NRVF6SK7EAKPLQH2PQTLR",
+      accountId: "TEST_SECRET_DO_NOT_USE",
       network: "testnet",
       includeZeroBalances: false,
     });
@@ -170,7 +170,7 @@ describe("createGetAccountBalanceTool", () => {
 
   it("should include XLM in results", async () => {
     const result = await tool.func({
-      accountId: "GBVUDZFQ7VMHEJPFDNS7BVTQMXHBDZ2HB2NRVF6SK7EAKPLQH2PQTLR",
+      accountId: "TEST_SECRET_DO_NOT_USE",
       network: "testnet",
       includeZeroBalances: false,
     });
@@ -183,7 +183,7 @@ describe("createGetAccountBalanceTool", () => {
 
   it("should include USDC trustline", async () => {
     const result = await tool.func({
-      accountId: "GBVUDZFQ7VMHEJPFDNS7BVTQMXHBDZ2HB2NRVF6SK7EAKPLQH2PQTLR",
+      accountId: "TEST_SECRET_DO_NOT_USE",
       network: "testnet",
       includeZeroBalances: false,
     });
@@ -209,15 +209,15 @@ describe("createPathPaymentStrictSendTool", () => {
 
   it("should execute a basic XLM → USDC payment", async () => {
     const result = await tool.func({
-      sourceSecretKey: "SCZANGBA5YELQQSERKITJDTNQ5KPCY7YGAPKZWF4ARBYBA36UZMBWTE",
+      sourceSecretKey: "TEST_SECRET_DO_NOT_USE",
       sendAsset: { code: "XLM" },
       sendAmount: "10",
       destAsset: {
         code: "USDC",
-        issuer: "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+        issuer: "TEST_SECRET_DO_NOT_USE",
       },
       minDestAmount: "9",
-      destinationAccountId: "GBVUDZFQ7VMHEJPFDNS7BVTQMXHBDZ2HB2NRVF6SK7EAKPLQH2PQTLR",
+      destinationAccountId: "TEST_SECRET_DO_NOT_USE",
       network: "testnet",
     });
 
@@ -229,15 +229,15 @@ describe("createPathPaymentStrictSendTool", () => {
 
   it("should include explorer URL in result", async () => {
     const result = await tool.func({
-      sourceSecretKey: "SCZANGBA5YELQQSERKITJDTNQ5KPCY7YGAPKZWF4ARBYBA36UZMBWTE",
+      sourceSecretKey: "TEST_SECRET_DO_NOT_USE",
       sendAsset: { code: "XLM" },
       sendAmount: "5",
       destAsset: {
         code: "USDC",
-        issuer: "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+        issuer: "TEST_SECRET_DO_NOT_USE",
       },
       minDestAmount: "4",
-      destinationAccountId: "GBVUDZFQ7VMHEJPFDNS7BVTQMXHBDZ2HB2NRVF6SK7EAKPLQH2PQTLR",
+      destinationAccountId: "TEST_SECRET_DO_NOT_USE",
       network: "testnet",
     });
 
@@ -260,13 +260,13 @@ describe("createInvokeContractTool", () => {
 
   it("should return simulation result when simulateOnly=true", async () => {
     const result = await tool.func({
-      sourceSecretKey: "SCZANGBA5YELQQSERKITJDTNQ5KPCY7YGAPKZWF4ARBYBA36UZMBWTE",
-      contractId: "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
+      sourceSecretKey: "TEST_SECRET_DO_NOT_USE",
+      contractId: "TEST_SECRET_DO_NOT_USE",
       functionName: "get_balance",
       args: [
         {
           type: "address",
-          value: "GBVUDZFQ7VMHEJPFDNS7BVTQMXHBDZ2HB2NRVF6SK7EAKPLQH2PQTLR",
+          value: "TEST_SECRET_DO_NOT_USE",
         },
       ],
       network: "testnet",
@@ -281,8 +281,8 @@ describe("createInvokeContractTool", () => {
 
   it("should return contractId and functionName in result", async () => {
     const result = await tool.func({
-      sourceSecretKey: "SCZANGBA5YELQQSERKITJDTNQ5KPCY7YGAPKZWF4ARBYBA36UZMBWTE",
-      contractId: "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
+      sourceSecretKey: "TEST_SECRET_DO_NOT_USE",
+      contractId: "TEST_SECRET_DO_NOT_USE",
       functionName: "total_supply",
       args: [],
       network: "testnet",
@@ -290,7 +290,7 @@ describe("createInvokeContractTool", () => {
     });
 
     const parsed = JSON.parse(result as string);
-    expect(parsed.contractId).toBe("CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA");
+    expect(parsed.contractId).toBe("TEST_SECRET_DO_NOT_USE");
     expect(parsed.functionName).toBe("total_supply");
   });
 });
