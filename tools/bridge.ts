@@ -43,61 +43,84 @@ export const bridgeTokenTool = new DynamicStructuredTool({
 
   schema: z.object({
     amount: z.string().describe("The amount of tokens to bridge"),
-    toAddress: z.string().describe("The destination address"),
+    toAddress: z.string().describe("The destination address on the target chain"),
     fromNetwork: z
       .enum(["stellar-testnet", "stellar-mainnet"])
       .default("stellar-testnet")
       .describe("Source Stellar network"),
+    destinationChain: z
+      .enum(["ETH", "BSC", "POL", "ARB", "OP", "AVA"])
+      .default("ETH")
+      .describe("The destination chain symbol (ETH, BSC, POL, ARB, OP, AVA)"),
+    symbol: z
+      .string()
+      .default("USDC")
+      .describe("The token symbol to bridge (defaults to USDC)"),
   }),
 
   func: async ({
     amount,
     toAddress,
     fromNetwork,
+    destinationChain = "ETH",
+    symbol = "USDC",
   }: {
     amount: string;
     toAddress: string;
     fromNetwork: StellarNetwork;
+    destinationChain?: string;
+    symbol?: string;
   }) => {
-    // Mainnet safeguard - additional layer beyond AgentClient
-    if (
-      fromNetwork === "stellar-mainnet" &&
-      process.env.ALLOW_MAINNET_BRIDGE !== "true"
-    ) {
-      throw new Error(
-        "Mainnet bridging is disabled. Set ALLOW_MAINNET_BRIDGE=true in your .env file to enable."
-      );
-    }
+    try {
+      // Mainnet safeguard - additional layer beyond AgentClient
+      if (
+        fromNetwork === "stellar-mainnet" &&
+        process.env.ALLOW_MAINNET_BRIDGE !== "true"
+      ) {
+        throw new Error(
+          "Mainnet bridging is disabled. Set ALLOW_MAINNET_BRIDGE=true in your .env file to enable."
+        );
+      }
 
-    const sdk = new AllbridgeCoreSdk({
-      ...nodeRpcUrlsDefault,
-      SRB: `${process.env.SRB_PROVIDER_URL}`,
-    });
+      const sdk = new AllbridgeCoreSdk({
+        ...nodeRpcUrlsDefault,
+        SRB: `${process.env.SRB_PROVIDER_URL}`,
+      });
 
-    const chainDetailsMap = await sdk.chainDetailsMap();
+      const chainDetailsMap = await sdk.chainDetailsMap();
 
-    const sourceToken = ensure(
-      chainDetailsMap[ChainSymbol.SRB].tokens.find(
-        (t) => t.symbol === "USDC"
-      )
-    );
-    const destinationToken = ensure(
-      chainDetailsMap[ChainSymbol.ETH].tokens.find(
-        (t) => t.symbol === "USDC"
-      )
-    );
+      const sourceToken = chainDetailsMap[ChainSymbol.SRB].tokens.find(
+          (t) => t.symbol === symbol
+        );
+      
+      if (!sourceToken) {
+        throw new Error(`Token ${symbol} not found on Soroban network.`);
+      }
 
-    const sendParams = {
-      amount,
-      fromAccountAddress: fromAddress,
-      toAccountAddress: toAddress,
-      sourceToken,
-      destinationToken,
-      messenger: Messenger.ALLBRIDGE,
-      extraGas: "1.15",
-      extraGasFormat: AmountFormat.FLOAT,
-      gasFeePaymentMethod: FeePaymentMethod.WITH_STABLECOIN,
-    };
+      const destChainSymbol = destinationChain as ChainSymbol;
+      if (!chainDetailsMap[destChainSymbol]) {
+        throw new Error(`Destination chain ${destinationChain} not supported.`);
+      }
+
+      const destinationToken = chainDetailsMap[destChainSymbol].tokens.find(
+          (t) => t.symbol === symbol
+        );
+
+      if (!destinationToken) {
+        throw new Error(`Token ${symbol} not found on ${destinationChain} network.`);
+      }
+
+      const sendParams = {
+        amount,
+        fromAccountAddress: fromAddress,
+        toAccountAddress: toAddress,
+        sourceToken,
+        destinationToken,
+        messenger: Messenger.ALLBRIDGE,
+        extraGas: "1.15",
+        extraGasFormat: AmountFormat.FLOAT,
+        gasFeePaymentMethod: FeePaymentMethod.WITH_STABLECOIN,
+      };
 
     const xdrTx = (await sdk.bridge.rawTxBuilder.send(
       sendParams
@@ -225,12 +248,16 @@ export const bridgeTokenTool = new DynamicStructuredTool({
       };
     }
 
-    return {
-      status: "confirmed",
-      hash: sent.hash,
-      network: fromNetwork,
-      asset: sourceToken.symbol,
-      amount,
-    };
+      return {
+        status: "confirmed",
+        hash: sent.hash,
+        network: fromNetwork,
+        asset: sourceToken.symbol,
+        amount,
+      };
+    } catch (error: any) {
+      console.error("Bridge tool error:", error);
+      throw new Error(`Bridge operation failed: ${error.message || String(error)}`);
+    }
   },
 });

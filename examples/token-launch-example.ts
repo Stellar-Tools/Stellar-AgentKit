@@ -57,9 +57,12 @@ async function exampleTokenLaunch() {
     console.log(`Distributor: ${result.distributorPublicKey}`);
     console.log(`Issuer Locked: ${result.issuerLocked}`);
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("\n❌ Token launch failed:");
-    console.error(error.message);
+    const message = error instanceof Error 
+      ? error.message 
+      : String(error)
+    console.error(message)
   }
 }
 
@@ -95,9 +98,12 @@ async function exampleTokenLaunchWithLocking() {
     console.log(`The issuer account is now locked - no more tokens can be minted.`);
     console.log(`Transaction Hash: ${result.transactionHash}`);
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("\n❌ Token launch with locking failed:");
-    console.error(error.message);
+    const message = error instanceof Error 
+      ? error.message 
+      : String(error)
+    console.error(message)
   }
 }
 

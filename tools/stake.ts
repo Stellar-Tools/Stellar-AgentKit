@@ -19,52 +19,67 @@ export const StellarContractTool = new DynamicStructuredTool({
   name: "stellar_contract_tool",
   description:
     "Interact with a staking contract on Stellar Soroban: initialize, stake, unstake, claim rewards, or get stake.",
-  schema: z.object({
-    action: z.enum(["initialize", "stake", "unstake", "claim_rewards", "get_stake"]),
-    tokenAddress: z.string().optional(), // Only for initialize
-    rewardRate: z.number().optional(), // Only for initialize
-    amount: z.number().optional(), // For stake/unstake
-    userAddress: z.string().optional(), // For get_stake
-  }),
+  schema: z.discriminatedUnion("action", [
+    z.object({
+      action: z.literal("initialize"),
+      tokenAddress: z.string().describe("The token address to be used for rewards"),
+      rewardRate: z.number().describe("The rate of rewards issuance"),
+      fromNetwork: z.enum(["stellar-testnet", "stellar-mainnet"]).default("stellar-testnet"),
+    }),
+    z.object({
+      action: z.literal("stake"),
+      amount: z.number().describe("The amount of tokens to stake"),
+      fromNetwork: z.enum(["stellar-testnet", "stellar-mainnet"]).default("stellar-testnet"),
+    }),
+    z.object({
+      action: z.literal("unstake"),
+      amount: z.number().describe("The amount of tokens to unstake"),
+      fromNetwork: z.enum(["stellar-testnet", "stellar-mainnet"]).default("stellar-testnet"),
+    }),
+    z.object({
+      action: z.literal("claim_rewards"),
+      fromNetwork: z.enum(["stellar-testnet", "stellar-mainnet"]).default("stellar-testnet"),
+    }),
+    z.object({
+      action: z.literal("get_stake"),
+      userAddress: z.string().describe("The user address to query stake for"),
+      fromNetwork: z.enum(["stellar-testnet", "stellar-mainnet"]).default("stellar-testnet"),
+    }),
+  ]),
   func: async (input: any) => {
-    const { action, tokenAddress, rewardRate, amount, userAddress } = input;
+    const { action, tokenAddress, rewardRate, amount, userAddress, fromNetwork } = input;
+    
+    // Build dynamic config based on network
+    const config = {
+      networkPassphrase: fromNetwork === "stellar-mainnet" ? "Public Global Stellar Network ; October 2015" : "Test SDF Network ; September 2015",
+      rpcUrl: fromNetwork === "stellar-mainnet" ? "https://soroban.stellar.org" : "https://soroban-testnet.stellar.org"
+    };
+
     try {
       switch (action) {
         case "initialize": {
-          if (!tokenAddress || rewardRate === undefined) {
-            throw new Error("tokenAddress and rewardRate are required for initialize");
-          }
-          const result = await initialize(STELLAR_PUBLIC_KEY, tokenAddress, rewardRate);
+          const result = await initialize(STELLAR_PUBLIC_KEY, tokenAddress, rewardRate, config);
           return result ?? "Contract initialized successfully.";
         }
 
         case "stake": {
-          if (amount === undefined) {
-            throw new Error("amount is required for stake");
-          }
-          const result = await stake(STELLAR_PUBLIC_KEY, amount);
+          const result = await stake(STELLAR_PUBLIC_KEY, amount, config);
           return result ?? `Staked ${amount} successfully.`;
         }
 
         case "unstake": {
-          if (amount === undefined) {
-            throw new Error("amount is required for unstake");
-          }
-          const result = await unstake(STELLAR_PUBLIC_KEY, amount);
+          const result = await unstake(STELLAR_PUBLIC_KEY, amount, config);
           return result ?? `Unstaked ${amount} successfully.`;
         }
 
         case "claim_rewards": {
-          const result = await claimRewards(STELLAR_PUBLIC_KEY);
+          const result = await claimRewards(STELLAR_PUBLIC_KEY, config);
           return result ?? "Rewards claimed successfully.";
         }
 
         case "get_stake": {
-          if (!userAddress) {
-            throw new Error("userAddress is required for get_stake");
-          }
-          const stakeAmount = await getStake(STELLAR_PUBLIC_KEY, userAddress);
-          return `Stake for ${userAddress}: ${stakeAmount}`;
+          const stakeAmount = await getStake(STELLAR_PUBLIC_KEY, userAddress, config);
+          return stakeAmount;
         }
 
         default:

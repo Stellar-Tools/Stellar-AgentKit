@@ -11,6 +11,11 @@ export const stellarSendPaymentTool = new DynamicStructuredTool({
     amount: z.string().describe("The amount of XLM to send (as a string)"),
   }),
   func: async ({ recipient, amount }: { recipient: string; amount: string }) => {
+    const isMainnet = process.env.STELLAR_NETWORK === "mainnet";
+    const horizonUrl = isMainnet ? "https://horizon.stellar.org" : "https://horizon-testnet.stellar.org";
+    const networkPassphrase = isMainnet ? StellarSdk.Networks.PUBLIC : StellarSdk.Networks.TESTNET;
+
+
     try {
       // Step 1: Validate inputs
       if (!StellarSdk.StrKey.isValidEd25519PublicKey(recipient)) {
@@ -29,12 +34,12 @@ export const stellarSendPaymentTool = new DynamicStructuredTool({
       const sourcePublicKey = keypair.publicKey();
 
       // Step 3: Create an unsigned transaction
-      const server = new StellarSdk.Horizon.Server("https://horizon-testnet.stellar.org");
+      const server = new StellarSdk.Horizon.Server(horizonUrl);
       const account = await server.loadAccount(sourcePublicKey);
 
       const transaction = new StellarSdk.TransactionBuilder(account, {
         fee: StellarSdk.BASE_FEE,
-        networkPassphrase: StellarSdk.Networks.TESTNET,
+        networkPassphrase,
       })
         .addOperation(
           StellarSdk.Operation.payment({
@@ -51,15 +56,13 @@ export const stellarSendPaymentTool = new DynamicStructuredTool({
       const signedTxXdr = transaction.toXDR();
 
       // Step 5: Submit the transaction
-      const tx = new StellarSdk.Transaction(signedTxXdr, StellarSdk.Networks.TESTNET);
-      const response = await server.submitTransaction(tx);
+      const response = await server.submitTransaction(transaction);
 
       return `Transaction successful! Hash: ${response.hash}`;
-    } catch (error) {
+    } catch (error: any) {
       const errorMessage =
-        (error as { response?: { data?: { title?: string } }; message?: string })
-          .response?.data?.title ||
-        (error as Error).message ||
+        error.response?.data?.title ||
+        error.message ||
         "Unknown error occurred";
       return `Transaction failed: ${errorMessage}`;
     }

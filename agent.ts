@@ -7,14 +7,16 @@ import {
 } from "./lib/contract";
 import { bridgeTokenTool } from "./tools/bridge";
 import {
-  Server,
   Keypair,
   Asset,
   TransactionBuilder,
   Operation,
   Networks,
-  BASE_FEE
+  BASE_FEE,
+  Horizon
 } from "@stellar/stellar-sdk";
+
+type Network = "testnet" | "mainnet";
 
 export interface AgentConfig {
   network: "testnet" | "mainnet";
@@ -76,7 +78,7 @@ export class AgentClient {
 
     this.network = config.network;
     this.publicKey = config.publicKey || process.env.STELLAR_PUBLIC_KEY || "";
-    this.rpcUrl = config.rpcUrl || (config.network === "mainnet" 
+    this.rpcUrl = config.rpcUrl || (config.network === ("mainnet" as string)
       ? "https://horizon.stellar.org" 
       : "https://horizon-testnet.stellar.org");
     
@@ -101,8 +103,22 @@ export class AgentClient {
       params.to,
       params.buyA,
       params.out,
-      params.inMax
+      params.inMax,
+      this.getSorobanConfig()
     );
+  }
+
+  private getSorobanConfig() {
+    // Attempt to map Horizon URLs to Soroban URLs if not explicitly provided
+    // Horizon: https://horizon-testnet.stellar.org -> Soroban: https://soroban-testnet.stellar.org
+    const rpcUrl = this.rpcUrl.includes("horizon") 
+      ? this.rpcUrl.replace("horizon", "soroban") 
+      : this.rpcUrl;
+
+    return {
+      rpcUrl,
+      networkPassphrase: (this.network as string) === "mainnet" ? Networks.PUBLIC : Networks.TESTNET
+    };
   }
 
   /**
@@ -120,14 +136,16 @@ export class AgentClient {
   async bridge(params: {
     amount: string;
     toAddress: string;
+    destinationChain?: string;
+    symbol?: string;
   }) {
     return await bridgeTokenTool.func({
       ...params,
       fromNetwork:
-        this.network === "mainnet"
+        (this.network as string) === "mainnet"
           ? "stellar-mainnet"
           : "stellar-testnet",
-    });
+    } as any);
   }
 
   /**
@@ -147,7 +165,8 @@ export class AgentClient {
         params.desiredA,
         params.minA,
         params.desiredB,
-        params.minB
+        params.minB,
+        this.getSorobanConfig()
       );
     },
 
@@ -162,16 +181,17 @@ export class AgentClient {
         params.to,
         params.shareAmount,
         params.minA,
-        params.minB
+        params.minB,
+        this.getSorobanConfig()
       );
     },
 
     getReserves: async () => {
-      return await contractGetReserves(this.publicKey);
+      return await contractGetReserves(this.publicKey, this.getSorobanConfig());
     },
 
     getShareId: async () => {
-      return await contractGetShareId(this.publicKey);
+      return await contractGetShareId(this.publicKey, this.getSorobanConfig());
     },
   };
 
@@ -236,8 +256,8 @@ export class AgentClient {
       const distributorPublicKey = distributorKeypair.publicKey();
 
       // Connect to Stellar network
-      const server = new Server(this.rpcUrl);
-      const networkPassphrase = this.network === "mainnet" ? Networks.PUBLIC : Networks.TESTNET;
+      const server = new Horizon.Server(this.rpcUrl);
+      const networkPassphrase = (this.network as string) === "mainnet" ? Networks.PUBLIC : Networks.TESTNET;
 
       // Step 1: Load or create issuer account
       let issuerAccount;
@@ -349,14 +369,14 @@ export class AgentClient {
    * @returns true if trustline exists, false otherwise
    */
   private async checkTrustlineExists(
-    server: Server, 
+    server: Horizon.Server, 
     accountPublicKey: string, 
     asset: Asset
   ): Promise<boolean> {
     try {
       const account = await server.loadAccount(accountPublicKey);
       
-      return account.balances.some(balance => {
+      return account.balances.some((balance: Horizon.ServerApi.BalanceLine) => {
         if (balance.asset_type === 'native') return false;
         
         return (
@@ -386,7 +406,7 @@ export class AgentClient {
    * @returns Transaction hash of the trustline creation
    */
   private async createTrustline(
-    server: Server,
+    server: Horizon.Server,
     accountKeypair: Keypair,
     asset: Asset,
     networkPassphrase: string
@@ -436,7 +456,7 @@ export class AgentClient {
    * @returns Transaction hash of the locking operation
    */
   private async lockIssuerAccount(
-    server: Server,
+    server: Horizon.Server,
     issuerKeypair: Keypair,
     networkPassphrase: string
   ): Promise<{ hash: string }> {

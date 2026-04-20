@@ -55,9 +55,9 @@ describe('Bridge Tool - Network Configuration', () => {
 
     it('should block mainnet when ALLOW_MAINNET_BRIDGE is false', () => {
       const fromNetwork: StellarNetwork = "stellar-mainnet";
-      const allowMainnetBridge = "false";
+      const allowMainnetBridge: string | undefined = "false";
       
-      const shouldBlock = fromNetwork === "stellar-mainnet" && allowMainnetBridge !== "true";
+      const shouldBlock = fromNetwork === "stellar-mainnet" && (allowMainnetBridge as string) !== "true";
       expect(shouldBlock).toBe(true);
     });
 
@@ -65,15 +65,15 @@ describe('Bridge Tool - Network Configuration', () => {
       const fromNetwork: StellarNetwork = "stellar-mainnet";
       const allowMainnetBridge = "true";
       
-      const shouldBlock = fromNetwork === "stellar-mainnet" && allowMainnetBridge !== "true";
+      const shouldBlock = fromNetwork === "stellar-mainnet" && (allowMainnetBridge as string) !== "true";
       expect(shouldBlock).toBe(false);
     });
 
     it('should always allow testnet regardless of ALLOW_MAINNET_BRIDGE', () => {
-      const fromNetwork: StellarNetwork = "stellar-testnet";
+      let fromNetwork: StellarNetwork = "stellar-testnet";
       const allowMainnetBridge = undefined;
       
-      const shouldBlock = fromNetwork === "stellar-mainnet" && allowMainnetBridge !== "true";
+      const shouldBlock = fromNetwork === ("stellar-mainnet" as StellarNetwork) && allowMainnetBridge !== "true";
       expect(shouldBlock).toBe(false);
     });
   });

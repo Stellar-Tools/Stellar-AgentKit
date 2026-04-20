@@ -12,10 +12,16 @@ import {
   import { signTransaction } from "./stellar";
   import { buildTransaction } from "../utils/buildTransaction";
   
-  // Configuration
-  const rpcUrl = "https://soroban-testnet.stellar.org";
-  const contractAddress = "CCUMBJFVC3YJOW3OOR6WTWTESH473ZSXQEGYPQDWXAYYC4J77OT4NVHJ"; // From networks.testnet.contractId
-  const networkPassphrase = Networks.TESTNET;
+  // Configuration defaults (can be overridden)
+  const DEFAULT_RPC_URL = "https://soroban-testnet.stellar.org";
+  const DEFAULT_CONTRACT_ADDRESS = "CCUMBJFVC3YJOW3OOR6WTWTESH473ZSXQEGYPQDWXAYYC4J77OT4NVHJ";
+  const DEFAULT_NETWORK_PASSPHRASE = Networks.TESTNET;
+  
+  export interface ContractConfig {
+    rpcUrl?: string;
+    contractAddress?: string;
+    networkPassphrase?: string;
+  }
   
   // Utility functions for ScVal conversion
   const addressToScVal = (address: string) => {
@@ -35,7 +41,11 @@ import {
   };
   
   // Core contract interaction function
-  const contractInt = async (caller: string, functName: string, values: any) => {
+  const contractInt = async (caller: string, functName: string, values: any, config?: ContractConfig) => {
+    const rpcUrl = config?.rpcUrl || DEFAULT_RPC_URL;
+    const contractAddress = config?.contractAddress || DEFAULT_CONTRACT_ADDRESS;
+    const networkPassphrase = config?.networkPassphrase || DEFAULT_NETWORK_PASSPHRASE;
+
     try {
       const server = new rpc.Server(rpcUrl, { allowHttp: true });
       const sourceAccount = await server.getAccount(caller).catch((err) => {
@@ -50,7 +60,7 @@ import {
         functionName: functName,
         args: values == null ? undefined : Array.isArray(values) ? values : [values],
       };
-      const transaction = buildTransaction("lp", sourceAccount, sorobanOperation);
+      const transaction = buildTransaction("lp", sourceAccount, sorobanOperation, { networkPassphrase });
   
       const simulation = await server.simulateTransaction(transaction).catch((err) => {
         console.error(`Simulation failed for ${functName}: ${err.message}`);
@@ -97,9 +107,9 @@ import {
       }
   
       // Handle both string and object response from signTransaction
-      const signedXDR = signedTxResponse
+    const signedXDR = signedTxResponse
   
-      const tx = TransactionBuilder.fromXDR(signedXDR, Networks.TESTNET);
+      const tx = TransactionBuilder.fromXDR(signedXDR, networkPassphrase);
       const txResult = await server.sendTransaction(tx).catch((err) => {
         console.error(`Send transaction failed for ${functName}: ${err.message}`);
         throw new Error(`Send transaction failed: ${err.message}`);
@@ -146,9 +156,9 @@ import {
   };
   
   // Contract interaction functions
-  export async function getShareId(caller: string): Promise<string | null> {
+  export async function getShareId(caller: string, config?: ContractConfig): Promise<string | null> {
     try {
-      const result = await contractInt(caller, "share_id", null);
+      const result = await contractInt(caller, "share_id", null, config);
       console.log("Share ID:", result);
       return result as string | null;
     } catch (error: unknown) {
@@ -164,7 +174,8 @@ import {
     desiredA: string,
     minA: string,
     desiredB: string,
-    minB: string
+    minB: string,
+    config?: ContractConfig
   ) {
     try {
       const toScVal = addressToScVal(to);
@@ -178,7 +189,7 @@ import {
         minAScVal,
         desiredBScVal,
         minBScVal,
-      ]);
+      ], config);
       console.log(`Deposited successfully to ${to}`);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -192,14 +203,15 @@ import {
     to: string,
     buyA: boolean,
     out: string,
-    inMax: string
+    inMax: string,
+    config?: ContractConfig
   ) {
     try {
       const toScVal = addressToScVal(to);
       const buyAScVal = booleanToScVal(buyA);
       const outScVal = numberToI128(out);
       const inMaxScVal = numberToI128(inMax);
-      await contractInt(caller, "swap", [toScVal, buyAScVal, outScVal, inMaxScVal]);
+      await contractInt(caller, "swap", [toScVal, buyAScVal, outScVal, inMaxScVal], config);
       console.log(`Swapped successfully to ${to}`);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -213,7 +225,8 @@ import {
     to: string,
     shareAmount: string,
     minA: string,
-    minB: string
+    minB: string,
+    config?: ContractConfig
   ): Promise<readonly [BigInt, BigInt] | null> {
     try {
       const toScVal = addressToScVal(to);
@@ -225,7 +238,7 @@ import {
         shareAmountScVal,
         minAScVal,
         minBScVal,
-      ]);
+      ], config);
       console.log(`Withdrawn successfully to ${to}:, ${result}`);
       return result ? (result as [BigInt, BigInt]) : null;
     } catch (error: unknown) {
@@ -235,9 +248,9 @@ import {
     }
   }
   
-  export async function getReserves(caller: string): Promise<readonly [BigInt, BigInt] | null> {
+  export async function getReserves(caller: string, config?: ContractConfig): Promise<readonly [BigInt, BigInt] | null> {
     try {
-      const result = await contractInt(caller, "get_rsrvs", null);
+      const result = await contractInt(caller, "get_rsrvs", null, config);
       console.log("Reserves:", result);
       return result ? (result as [BigInt, BigInt]) : null;
     } catch (error: unknown) {

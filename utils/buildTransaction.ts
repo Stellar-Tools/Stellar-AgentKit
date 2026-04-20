@@ -16,6 +16,7 @@ interface BuildTransactionConfig {
   fee?: string;
   timeout?: number;
   memo?: string;
+  networkPassphrase?: string;
 }
 
 /**
@@ -54,9 +55,9 @@ export function buildTransaction(
   const fee = config.fee || BASE_FEE;
   const timeout = config.timeout !== undefined ? config.timeout : getDefaultTimeout(operationType);
   const memo = config.memo;
+  const networkPassphrase = config.networkPassphrase || Networks.TESTNET;
 
   // Build transaction parameters
-  const networkPassphrase = Networks.TESTNET;
   const memoValue = memo ? Memo.text(memo) : undefined;
   const params = {
     fee,

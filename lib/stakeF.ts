@@ -9,10 +9,16 @@ import {
   import {signTransaction} from "./stellar";
   import { buildTransaction } from "../utils/buildTransaction";
   
-  // Configuration
-  const rpcUrl = "https://soroban-testnet.stellar.org";
-  const contractAddress = "CBTYOERLDPHPODHLZ7XKPUIJJTEZKYMBKEUA2JBCRPRMMDK6A4GM2UZF"; // Replace with actual deployed contract address
-  const networkPassphrase = Networks.TESTNET;
+  // Configuration defaults (can be overridden)
+  const DEFAULT_RPC_URL = "https://soroban-testnet.stellar.org";
+  const DEFAULT_CONTRACT_ADDRESS = "CBTYOERLDPHPODHLZ7XKPUIJJTEZKYMBKEUA2JBCRPRMMDK6A4GM2UZF";
+  const DEFAULT_NETWORK_PASSPHRASE = Networks.TESTNET;
+  
+  export interface StakeConfig {
+    rpcUrl?: string;
+    contractAddress?: string;
+    networkPassphrase?: string;
+  }
   
   const addressToScVal = (address: string) => {
     // Validate address format
@@ -27,7 +33,11 @@ import {
     return nativeToScVal(value, { type: "i128" });
   };
   
-  const contractInt = async (caller: string, functName: string, values: any) => {
+  const contractInt = async (caller: string, functName: string, values: any, config?: StakeConfig) => {
+    const rpcUrl = config?.rpcUrl || DEFAULT_RPC_URL;
+    const contractAddress = config?.contractAddress || DEFAULT_CONTRACT_ADDRESS;
+    const networkPassphrase = config?.networkPassphrase || DEFAULT_NETWORK_PASSPHRASE;
+
     try {
       const server = new rpc.Server(rpcUrl, { allowHttp: true });
       const sourceAccount = await server.getAccount(caller).catch((err) => {
@@ -42,7 +52,7 @@ import {
         functionName: functName,
         args: values == null ? undefined : Array.isArray(values) ? values : [values],
       };
-      const transaction = buildTransaction("stake", sourceAccount, sorobanOperation);
+      const transaction = buildTransaction("stake", sourceAccount, sorobanOperation, { networkPassphrase });
   
       // Prepare and sign transaction
       const preparedTx = await server.prepareTransaction(transaction).catch((err) => {
@@ -60,7 +70,7 @@ import {
       // Handle both string and object response from signTransaction
       const signedXDR = signedTxResponse;
   
-      const tx = TransactionBuilder.fromXDR(signedXDR, Networks.TESTNET);
+      const tx = TransactionBuilder.fromXDR(signedXDR, networkPassphrase);
       const txResult = await server.sendTransaction(tx).catch((err) => {
         throw new Error(`Failed to send transaction: ${err.message}`);
       });
@@ -88,11 +98,11 @@ import {
   };
   
   // Contract interaction functions
-  async function initialize(caller: string, tokenAddress: string, rewardRate: number) {
+  async function initialize(caller: string, tokenAddress: string, rewardRate: number, config?: StakeConfig) {
     try {
       const tokenScVal = addressToScVal(tokenAddress);
       const rewardRateScVal = numberToI128(rewardRate);
-      await contractInt(caller, "initialize", [tokenScVal, rewardRateScVal]);
+      await contractInt(caller, "initialize", [tokenScVal, rewardRateScVal], config);
       return "Contract initialized successfully";
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -100,11 +110,11 @@ import {
     }
   }
   
-  async function stake(caller: string, amount: number) {
+  async function stake(caller: string, amount: number, config?: StakeConfig) {
     try {
       const userScVal = addressToScVal(caller);
       const amountScVal = numberToI128(amount);
-      await contractInt(caller, "stake", [userScVal, amountScVal]);
+      await contractInt(caller, "stake", [userScVal, amountScVal], config);
       return `Staked ${amount} successfully`;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -112,11 +122,11 @@ import {
     }
   }
   
-  async function unstake(caller: string, amount: number) {
+  async function unstake(caller: string, amount: number, config?: StakeConfig) {
     try {
       const userScVal = addressToScVal(caller);
       const amountScVal = numberToI128(amount);
-      await contractInt(caller, "unstake", [userScVal, amountScVal]);
+      await contractInt(caller, "unstake", [userScVal, amountScVal], config);
       return `Unstaked ${amount} successfully`;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -124,10 +134,10 @@ import {
     }
   }
   
-  async function claimRewards(caller: string) {
+  async function claimRewards(caller: string, config?: StakeConfig) {
     try {
       const userScVal = addressToScVal(caller);
-      await contractInt(caller, "claim_rewards", userScVal);
+      await contractInt(caller, "claim_rewards", userScVal, config);
       return "Rewards claimed successfully";
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -135,12 +145,11 @@ import {
     }
   }
   
-  async function getStake(caller: string, userAddress: string) {
+  async function getStake(caller: string, userAddress: string, config?: StakeConfig) {
     try {
       const userScVal = addressToScVal(userAddress);
-      const result = await contractInt(caller, "get_stake", userScVal);
+      const result = await contractInt(caller, "get_stake", userScVal, config);
       return `Stake for ${userAddress}: ${result}`;
-      return result; // Returns i128 as a BigInt
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       return errorMessage; // Returns error message as a string

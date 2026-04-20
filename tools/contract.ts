@@ -19,18 +19,32 @@ export const StellarLiquidityContractTool = new DynamicStructuredTool({
   name: "stellar_liquidity_contract_tool",
   description:
     "Interact with a liquidity contract on Stellar Soroban: getShareId, deposit, swap, withdraw, getReserves.",
-  schema: z.object({
-    action: z.enum(["get_share_id", "deposit", "swap", "withdraw", "get_reserves"]),
-    to: z.string().optional(), // For deposit, swap, withdraw
-    desiredA: z.string().optional(), // For deposit
-    minA: z.string().optional(), // For deposit, withdraw
-    desiredB: z.string().optional(), // For deposit
-    minB: z.string().optional(), // For deposit, withdraw
-    buyA: z.boolean().optional(), // For swap
-    out: z.string().optional(), // For swap
-    inMax: z.string().optional(), // For swap
-    shareAmount: z.string().optional(), // For withdraw
-  }),
+  schema: z.discriminatedUnion("action", [
+    z.object({ action: z.literal("get_share_id") }),
+    z.object({
+      action: z.literal("deposit"),
+      to: z.string().describe("Recipient address"),
+      desiredA: z.string().describe("Desired amount of asset A"),
+      minA: z.string().describe("Minimum amount of asset A"),
+      desiredB: z.string().describe("Desired amount of asset B"),
+      minB: z.string().describe("Minimum amount of asset B"),
+    }),
+    z.object({
+      action: z.literal("swap"),
+      to: z.string().describe("Recipient address"),
+      buyA: z.boolean().describe("True if buying A, false if buying B"),
+      out: z.string().describe("Amount to receive"),
+      inMax: z.string().describe("Maximum amount to send"),
+    }),
+    z.object({
+      action: z.literal("withdraw"),
+      to: z.string().describe("Recipient address"),
+      shareAmount: z.string().describe("Amount of share tokens to burn"),
+      minA: z.string().describe("Minimum amount of asset A to receive"),
+      minB: z.string().describe("Minimum amount of asset B to receive"),
+    }),
+    z.object({ action: z.literal("get_reserves") }),
+  ]),
   func: async (input: any) => {
     const {
       action,
