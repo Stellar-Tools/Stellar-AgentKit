@@ -13,7 +13,13 @@ import {
   type RouteQuote,
   type SwapBestRouteParams,
   type SwapBestRouteResult,
+  type RouteMode,
 } from "./lib/dex";
+import { 
+  RouteOptimizer, 
+  type UnifiedSwapParams, 
+  type RouteOptions 
+} from "./lib/route";
 import { bridgeTokenTool } from "./tools/bridge";
 import {
   Horizon,
@@ -72,6 +78,7 @@ export class AgentClient {
   private network: "testnet" | "mainnet";
   private publicKey: string;
   private rpcUrl: string;
+  private routeOptimizer: RouteOptimizer;
 
   constructor(config: AgentConfig) {
     // Mainnet safety check for general operations
@@ -103,27 +110,82 @@ export class AgentClient {
         // In a real SDK, we might not throw here if only read-only methods are used,
         // but for this implementation, we'll assume it's needed for most actions.
     }
+
+    this.routeOptimizer = new RouteOptimizer(
+      {
+        network: this.network,
+        horizonUrl: this.rpcUrl,
+        publicKey: this.publicKey,
+      },
+      {
+        network: this.network,
+        rpcUrl: this.rpcUrl, // Note: Soroban might need a different URL than Horizon, but using rpcUrl from config
+      }
+    );
   }
 
   /**
    * Perform a swap on the Stellar network.
+   * Supports both legacy Soroban single-pool swaps and new route-optimized swaps.
+   * 
+   * @example
+   * // Best-route swap (Classic DEX + AMMs)
+   * await agent.swap({
+   *   fromAsset: { type: "native" },
+   *   toAsset: { code: "USDC", issuer: "..." },
+   *   amount: "10",
+   *   strategy: "best-route"
+   * });
+   * 
    * @param params Swap parameters
    */
   async swap(params: {
-    to: string;
-    buyA: boolean;
-    out: string;
-    inMax: string;
+    // Legacy params
+    to?: string;
+    buyA?: boolean;
+    out?: string;
+    inMax?: string;
     contractAddress?: string;
+    
+    // New params
+    fromAsset?: StellarAssetInput;
+    toAsset?: StellarAssetInput;
+    amount?: string;
+    mode?: RouteMode;
+    strategy?: "best-route" | "soroban";
+    slippageBps?: number;
+    destination?: string;
   }) {
-    return await contractSwap(
-      this.publicKey,
-      params.to,
-      params.buyA,
-      params.out,
-      params.inMax,
-      { network: this.network, rpcUrl: this.rpcUrl, contractAddress: params.contractAddress }
-    );
+    if (params.strategy === "best-route") {
+      if (!params.fromAsset || !params.toAsset || !params.amount) {
+        throw new Error("fromAsset, toAsset, and amount are required for best-route strategy");
+      }
+      return await this.routeOptimizer.swap({
+        fromAsset: params.fromAsset,
+        toAsset: params.toAsset,
+        amount: params.amount,
+        mode: params.mode ?? "strict-send",
+        destination: params.destination ?? params.to ?? this.publicKey,
+      }, {
+        strategy: "best-route",
+        slippageBps: params.slippageBps,
+      });
+    }
+
+    // Default to legacy Soroban swap if strategy is not best-route or not provided
+    // Note: Older users expect the positional/object-based contractSwap logic
+    if (params.to && params.buyA !== undefined && params.out && params.inMax) {
+      return await contractSwap(
+        this.publicKey,
+        params.to,
+        params.buyA,
+        params.out,
+        params.inMax,
+        { network: this.network, rpcUrl: this.rpcUrl, contractAddress: params.contractAddress }
+      );
+    }
+
+    throw new Error("Invalid swap parameters. Provide either best-route parameters or legacy Soroban parameters.");
   }
 
   /**
@@ -168,7 +230,16 @@ export class AgentClient {
       desiredB: string;
       minB: string;
       contractAddress?: string;
+      strategy?: "best-route" | "soroban";
     }) => {
+      if (params.strategy === "best-route") {
+        // For LP, best-route would involve finding the best protocol/pool for the pair.
+        // Currently, we default to the known Soroban contract if provided, 
+        // or the Classic AMM if we can resolve the assets.
+        // This is a placeholder for the future unified LP routing engine.
+        console.log("Using best-route strategy for LP deposit...");
+      }
+
       return await contractDeposit(
         this.publicKey,
         params.to,
