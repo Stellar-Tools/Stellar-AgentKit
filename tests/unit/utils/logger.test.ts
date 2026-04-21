@@ -109,9 +109,9 @@ describe('Logger System', () => {
       const logger = createLogger('TestModule');
       logger.info('Test message', {
         publicKey: 'GABC123...',
-        privateKey: 'SSECRET123',
-        secret: 'hidden',
-        password: 'pass123',
+        privateKey: 'SAMPLE_PRIVATE_KEY',
+        secret: 'sample_secret',
+        password: 'sample_password',
         normalField: 'visible'
       });
 
@@ -131,16 +131,16 @@ describe('Logger System', () => {
     it('should not sanitize when disabled', () => {
       const logger = createLogger('TestModule', { sanitizeSensitiveData: false });
       logger.info('Test message', {
-        privateKey: 'SSECRET123',
-        secret: 'hidden'
+        privateKey: 'SAMPLE_PRIVATE_KEY',
+        secret: 'sample_secret'
       });
 
       expect(mockConsole.info).toHaveBeenCalledWith(
         expect.any(String),
         expect.any(String),
         expect.objectContaining({
-          privateKey: 'SSECRET123',
-          secret: 'hidden'
+          privateKey: 'SAMPLE_PRIVATE_KEY',
+          secret: 'sample_secret'
         })
       );
     });
@@ -150,9 +150,9 @@ describe('Logger System', () => {
       logger.info('Test message', {
         user: {
           name: 'John',
-          privateKey: 'SSECRET123',
+          privateKey: 'SAMPLE_PRIVATE_KEY',
           profile: {
-            secret: 'hidden',
+            secret: 'sample_secret',
             public: 'visible'
           }
         }

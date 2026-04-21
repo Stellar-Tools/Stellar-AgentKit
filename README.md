@@ -450,8 +450,8 @@ logger.logTokenLaunch("creation", "MYTOKEN", { issuer: "GABC123..." });
 ```typescript
 logger.info("User operation", {
   publicKey: "GABC123DEF456...",     // Shown (public)
-  privateKey: "SSECRET123...",        // Redacted to [REDACTED]
-  password: "secret123",              // Redacted to [REDACTED]
+  privateKey: "SAMPLE_PRIVATE_KEY...",        // Redacted to [REDACTED]
+  password: "sample_secret",              // Redacted to [REDACTED]
   normalField: "visible"              // Shown
 });
 ```
