@@ -32,7 +32,7 @@ type StellarNetwork = "stellar-testnet" | "stellar-mainnet";
  */
 export type TargetChain = "ethereum" | "polygon" | "arbitrum" | "base";
 
-const TARGET_CHAIN_MAP: Record<TargetChain, ChainSymbol> = {
+export const TARGET_CHAIN_MAP: Record<TargetChain, ChainSymbol> = {
   ethereum: ChainSymbol.ETH,
   polygon: ChainSymbol.POL,
   arbitrum: ChainSymbol.ARB,

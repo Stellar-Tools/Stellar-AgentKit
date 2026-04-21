@@ -341,11 +341,115 @@ const shareId = await agent.lp.getShareId();
 
 ---
 
+## 🎯 Pre-Execution Simulation
+
+AgentKit provides comprehensive simulation capabilities to test transactions before execution, allowing users to:
+
+- **Validate parameters** and catch errors early
+- **Estimate gas fees** and resource costs  
+- **Verify transaction outcomes** without committing funds
+- **Test edge cases** and failure scenarios
+
+### Swap Simulation
+
+Simulate token swaps before execution:
+
+```typescript
+import { AgentClient } from "stellar-agentkit";
+
+const agent = new AgentClient({
+  network: "testnet",
+  publicKey: "YOUR_TESTNET_PUBLIC_KEY"
+});
+
+// Simulate a swap operation
+const swapSimulation = await agent.simulate.swap({
+  to: "recipient_address",
+  buyA: true,
+  out: "100",
+  inMax: "110"
+});
+
+console.log("Swap simulation result:", swapSimulation);
+// Returns: { status: "simulated", minResourceFee: 12345, cost: {...}, events: 2, result: {...} }
+```
+
+### Bridge Simulation
+
+Simulate cross-chain bridge operations:
+
+```typescript
+// Simulate a bridge operation
+const bridgeSimulation = await agent.simulate.bridge({
+  amount: "100",
+  toAddress: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+  targetChain: "ethereum"
+});
+
+console.log("Bridge simulation result:", bridgeSimulation);
+// Returns: { status: "simulated", network: "stellar-testnet", targetChain: "ethereum", 
+//           amount: "100", minResourceFee: 23456, cost: {...}, events: 3, 
+//           result: {...}, transactionXDR: "..." }
+```
+
+### Liquidity Pool Simulation
+
+Simulate LP operations:
+
+```typescript
+// Simulate LP deposit
+const depositSimulation = await agent.simulate.lp.deposit({
+  to: "recipient_address",
+  desiredA: "1000",
+  minA: "950",
+  desiredB: "1000",
+  minB: "950"
+});
+
+// Simulate LP withdrawal
+const withdrawSimulation = await agent.simulate.lp.withdraw({
+  to: "recipient_address",
+  shareAmount: "100",
+  minA: "95",
+  minB: "95"
+});
+
+console.log("LP simulation results:", { depositSimulation, withdrawSimulation });
+```
+
+### Simulation Result Format
+
+All simulation methods return structured results:
+
+```typescript
+interface SimulationResult {
+  status: "simulated" | "failed";     // Success/failure status
+  error?: string;                      // Error details if failed
+  minResourceFee?: number;             // Estimated resource fee
+  cost?: any;                         // Detailed cost breakdown
+  events?: number;                     // Number of events emitted
+  result?: any;                       // Expected return value
+}
+```
+
+### Benefits of Simulation
+
+✅ **Risk Mitigation**: Test parameters before committing real funds
+✅ **Cost Estimation**: Understand gas fees and resource costs upfront  
+✅ **Error Detection**: Catch invalid parameters early
+✅ **Development Efficiency**: Faster iteration without waiting for transactions
+✅ **Mainnet Safety**: Reduce risk of costly mistakes on live networks
+
+---
+
 ## 🧪 Testing
 
 ```bash
 # Run test suite
 node test/bridge-tests.mjs
+
+# Run simulation tests
+node test/simulation-tests.mjs
 
 # View test results
 # ✅ 20/20 tests passed

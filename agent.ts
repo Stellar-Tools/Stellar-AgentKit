@@ -14,7 +14,7 @@ import {
   type SwapBestRouteParams,
   type SwapBestRouteResult,
 } from "./lib/dex";
-import { bridgeTokenTool } from "./tools/bridge";
+import { bridgeTokenTool, TARGET_CHAIN_MAP } from "./tools/bridge";
 import {
   Horizon,
   Keypair,
@@ -58,6 +58,48 @@ export interface LaunchTokenResult {
   };
   distributorPublicKey: string;
   issuerLocked: boolean;
+}
+
+// Simulation result types
+export interface SimulationResult {
+  status: "simulated" | "failed";
+  error?: string;
+  minResourceFee?: number;
+  cost?: any;
+  events?: number;
+  result?: any;
+}
+
+export interface SwapSimulationResult extends SimulationResult {
+  to: string;
+  buyA: boolean;
+  out: string;
+  inMax: string;
+}
+
+export interface BridgeSimulationResult extends SimulationResult {
+  network: "stellar-testnet" | "stellar-mainnet";
+  targetChain: "ethereum" | "polygon" | "arbitrum" | "base";
+  amount: string;
+  toAddress: string;
+  transactionXDR?: string;
+}
+
+export interface LpSimulationResult extends SimulationResult {
+  to: string;
+}
+
+export interface LpDepositSimulationResult extends LpSimulationResult {
+  desiredA: string;
+  minA: string;
+  desiredB: string;
+  minB: string;
+}
+
+export interface LpWithdrawSimulationResult extends LpSimulationResult {
+  shareAmount: string;
+  minA: string;
+  minB: string;
 }
 
 export type {
@@ -237,6 +279,303 @@ export class AgentClient {
       );
     },
   };
+
+  /**
+   * Pre-execution simulation interface.
+   * 
+   * Allows users to simulate transactions before execution to:
+   * - Validate parameters and catch errors early
+   * - Estimate gas fees and resource costs
+   * - Verify transaction outcomes without committing funds
+   * - Test edge cases and failure scenarios
+   * 
+   * All simulation methods return detailed results including:
+   * - Success/failure status
+   * - Estimated costs (fees, resources)
+   * - Expected outcomes (amounts, balances)
+   * - Error details if applicable
+   */
+  public simulate = {
+    /**
+     * Simulate a swap operation before execution.
+     * 
+     * @param params Swap parameters identical to agent.swap()
+     * @returns Simulation results with costs, outcomes, and validation
+     */
+    swap: async (params: {
+      to: string;
+      buyA: boolean;
+      out: string;
+      inMax: string;
+      contractAddress?: string;
+    }): Promise<SwapSimulationResult> => {
+      const result = await contractSwap(
+        this.publicKey,
+        params.to,
+        params.buyA,
+        params.out,
+        params.inMax,
+        { network: this.network, rpcUrl: this.rpcUrl, contractAddress: params.contractAddress, simulate: true }
+      );
+      
+      // Parse the JSON result from contract simulation
+      const simulationData = JSON.parse(result as string);
+      
+      return {
+        status: simulationData.status,
+        error: simulationData.error,
+        minResourceFee: simulationData.minResourceFee,
+        cost: simulationData.cost,
+        events: simulationData.events,
+        result: simulationData.result,
+        to: params.to,
+        buyA: params.buyA,
+        out: params.out,
+        inMax: params.inMax,
+      };
+    },
+
+    /**
+     * Simulate a bridge operation before execution.
+     * 
+     * @param params Bridge parameters identical to agent.bridge()
+     * @returns Simulation results with costs, outcomes, and validation
+     */
+    bridge: async (params: {
+      amount: string;
+      toAddress: string;
+      targetChain?: "ethereum" | "polygon" | "arbitrum" | "base";
+    }): Promise<BridgeSimulationResult> => {
+      // For bridge simulation, we need to create a special simulation mode
+      // that doesn't actually submit transactions but returns the expected outcome
+      return await this.simulateBridgeOperation(params);
+    },
+
+    /**
+     * Simulate LP operations before execution.
+     */
+    lp: {
+      /**
+       * Simulate a liquidity deposit operation.
+       * 
+       * @param params Deposit parameters identical to agent.lp.deposit()
+       * @returns Simulation results with costs, outcomes, and validation
+       */
+      deposit: async (params: {
+        to: string;
+        desiredA: string;
+        minA: string;
+        desiredB: string;
+        minB: string;
+        contractAddress?: string;
+      }): Promise<LpDepositSimulationResult> => {
+        const result = await contractDeposit(
+          this.publicKey,
+          params.to,
+          params.desiredA,
+          params.minA,
+          params.desiredB,
+          params.minB,
+          { network: this.network, rpcUrl: this.rpcUrl, contractAddress: params.contractAddress, simulate: true }
+        );
+        
+        // Parse the JSON result from contract simulation
+        const simulationData = JSON.parse(result as string);
+        
+        return {
+          status: simulationData.status,
+          error: simulationData.error,
+          minResourceFee: simulationData.minResourceFee,
+          cost: simulationData.cost,
+          events: simulationData.events,
+          result: simulationData.result,
+          to: params.to,
+          desiredA: params.desiredA,
+          minA: params.minA,
+          desiredB: params.desiredB,
+          minB: params.minB,
+        };
+      },
+
+      /**
+       * Simulate a liquidity withdrawal operation.
+       * 
+       * @param params Withdraw parameters identical to agent.lp.withdraw()
+       * @returns Simulation results with costs, outcomes, and validation
+       */
+      withdraw: async (params: {
+        to: string;
+        shareAmount: string;
+        minA: string;
+        minB: string;
+        contractAddress?: string;
+      }): Promise<LpWithdrawSimulationResult> => {
+        const result = await contractWithdraw(
+          this.publicKey,
+          params.to,
+          params.shareAmount,
+          params.minA,
+          params.minB,
+          { network: this.network, rpcUrl: this.rpcUrl, contractAddress: params.contractAddress, simulate: true }
+        );
+        
+        // Parse JSON result from contract simulation
+        let simulationData;
+        try {
+          // Check if result is a string (JSON) or other type
+          if (typeof result === 'string') {
+            simulationData = JSON.parse(result);
+          } else {
+            // Handle case where result is not JSON (e.g., for withdraw returning tuple)
+            simulationData = {
+              status: "simulated",
+              result: result
+            };
+          }
+        } catch (e) {
+          // Fallback for any parsing errors
+          simulationData = {
+            status: "simulated",
+            result: result
+          };
+        }
+        
+        return {
+          status: simulationData.status || "simulated",
+          error: simulationData.error,
+          minResourceFee: simulationData.minResourceFee,
+          cost: simulationData.cost,
+          events: simulationData.events,
+          result: simulationData.result,
+          to: params.to,
+          shareAmount: params.shareAmount,
+          minA: params.minA,
+          minB: params.minB,
+        };
+      },
+    },
+  };
+
+  /**
+   * Internal method to simulate bridge operations.
+   * Bridge operations use external SDK (AllbridgeCoreSdk) which doesn't have built-in simulation,
+   * so we create a simulation by building the transaction and analyzing it without submitting.
+   */
+  private async simulateBridgeOperation(params: {
+    amount: string;
+    toAddress: string;
+    targetChain?: "ethereum" | "polygon" | "arbitrum" | "base";
+  }): Promise<BridgeSimulationResult> {
+    try {
+      const targetChain = params.targetChain ?? "ethereum";
+      const fromNetwork = this.network === "mainnet" ? "stellar-mainnet" : "stellar-testnet";
+      
+      // Import the bridge SDK for simulation
+      const { AllbridgeCoreSdk, ChainSymbol, FeePaymentMethod, Messenger, nodeRpcUrlsDefault } = await import("@allbridge/bridge-core-sdk");
+      const { ensure } = await import("../utils/utils");
+      
+      const sdk = new AllbridgeCoreSdk({
+        ...nodeRpcUrlsDefault,
+        SRB: process.env.SRB_PROVIDER_URL || "https://soroban-testnet.stellar.org",
+      });
+
+      const chainDetailsMap = await sdk.chainDetailsMap();
+      const destinationChainSymbol = TARGET_CHAIN_MAP[targetChain as keyof typeof TARGET_CHAIN_MAP];
+      
+      const sourceToken = ensure(
+        chainDetailsMap[ChainSymbol.SRB].tokens.find((t) => t.symbol === "USDC")
+      );
+
+      const destinationChainDetails = chainDetailsMap[destinationChainSymbol];
+      if (!destinationChainDetails) {
+        throw new Error(`Chain not supported by Allbridge: ${targetChain}`);
+      }
+      const destinationToken = ensure(
+        destinationChainDetails.tokens.find((t) => t.symbol === "USDC")
+      );
+
+      // Build transaction parameters (same as actual bridge)
+      const sendParams = {
+        amount: params.amount,
+        fromAccountAddress: this.publicKey,
+        toAccountAddress: params.toAddress,
+        sourceToken,
+        destinationToken,
+        messenger: Messenger.ALLBRIDGE,
+        extraGas: "1.15",
+        extraGasFormat: "FLOAT" as const,
+        gasFeePaymentMethod: FeePaymentMethod.WITH_STABLECOIN,
+      };
+
+      // Get the unsigned transaction XDR without signing or submitting
+      const xdrTx = (await sdk.bridge.rawTxBuilder.send(sendParams)) as string;
+
+      // Simulate the transaction using Stellar RPC
+      const { rpc: StellarRpc, Networks } = await import("@stellar/stellar-sdk");
+      const server = new StellarRpc.Server(
+        this.network === "mainnet" 
+          ? "https://mainnet.stellar.validationcloudapi.com/v1/default" 
+          : "https://soroban-testnet.stellar.org"
+      );
+      
+      const networkPassphrase = this.network === "mainnet" ? Networks.PUBLIC : Networks.TESTNET;
+      const { buildTransactionFromXDR } = await import("../utils/buildTransaction");
+      
+      const transaction = buildTransactionFromXDR(
+        "bridge",
+        xdrTx,
+        networkPassphrase
+      );
+
+      // Simulate the transaction
+      const simulation = await server.simulateTransaction(transaction);
+      
+      if (simulation.error) {
+        return {
+          status: "failed",
+          error: simulation.error,
+          network: fromNetwork,
+          targetChain,
+          amount: params.amount,
+          toAddress: params.toAddress,
+        };
+      }
+
+      // Parse simulation results
+      let returnValue = null;
+      if (simulation.result?.retval) {
+        try {
+          const { scValToNative } = await import("@stellar/stellar-sdk");
+          returnValue = scValToNative(simulation.result.retval);
+        } catch (e) {
+          returnValue = "Failed to parse return value";
+        }
+      }
+
+      return {
+        status: "simulated",
+        network: fromNetwork,
+        targetChain,
+        amount: params.amount,
+        toAddress: params.toAddress,
+        minResourceFee: simulation.minResourceFee,
+        cost: simulation.cost,
+        events: simulation.events?.length || 0,
+        result: returnValue,
+        transactionXDR: xdrTx, // Include XDR for debugging
+      };
+      
+    } catch (error: any) {
+      return {
+        status: "failed",
+        error: error.message,
+        network: this.network === "mainnet" ? "stellar-mainnet" : "stellar-testnet",
+        targetChain: params.targetChain ?? "ethereum",
+        amount: params.amount,
+        toAddress: params.toAddress,
+      };
+    }
+  }
 
   /**
    * Launch a new token on the Stellar network.
