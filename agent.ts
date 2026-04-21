@@ -15,6 +15,8 @@ import {
   type SwapBestRouteResult,
 } from "./lib/dex";
 import { bridgeTokenTool } from "./tools/bridge";
+import { AnalyticsManager } from "./lib/analyticsManager";
+import type { PerformanceSummary, DetailedAnalytics, FilterOptions } from "./lib/analytics";
 import {
   Horizon,
   Keypair,
@@ -72,6 +74,7 @@ export class AgentClient {
   private network: "testnet" | "mainnet";
   private publicKey: string;
   private rpcUrl: string;
+  private analytics: AnalyticsManager;
 
   constructor(config: AgentConfig) {
     // Mainnet safety check for general operations
@@ -99,6 +102,13 @@ export class AgentClient {
       ? "https://horizon.stellar.org" 
       : "https://horizon-testnet.stellar.org");
     
+    // Initialize analytics manager
+    this.analytics = new AnalyticsManager({
+      enablePersistence: true,
+      maxRecords: 10000,
+      retentionDays: 30
+    });
+    
     if (!this.publicKey && this.network === "testnet") {
         // In a real SDK, we might not throw here if only read-only methods are used,
         // but for this implementation, we'll assume it's needed for most actions.
@@ -116,14 +126,37 @@ export class AgentClient {
     inMax: string;
     contractAddress?: string;
   }) {
-    return await contractSwap(
-      this.publicKey,
-      params.to,
-      params.buyA,
-      params.out,
-      params.inMax,
-      { network: this.network, rpcUrl: this.rpcUrl, contractAddress: params.contractAddress }
-    );
+    const startTime = Date.now();
+    
+    // Start tracking the transaction
+    const transactionId = this.analytics.startTransaction('swap', {
+      inputAsset: params.buyA ? 'B' : 'A', // Simplified - would need actual asset identification
+      outputAsset: params.buyA ? 'A' : 'B',
+      inputAmount: params.inMax,
+      outputAmount: params.out,
+      expectedOutput: params.out
+    });
+
+    try {
+      const result = await contractSwap(
+        this.publicKey,
+        params.to,
+        params.buyA,
+        params.out,
+        params.inMax,
+        { network: this.network, rpcUrl: this.rpcUrl, contractAddress: params.contractAddress }
+      );
+
+      // Complete the transaction tracking
+      const executionTime = Date.now() - startTime;
+      this.analytics.completeTransaction(transactionId, result, executionTime);
+
+      return result;
+    } catch (error) {
+      // Mark the transaction as failed
+      this.analytics.failTransaction(transactionId, error);
+      throw error;
+    }
   }
 
   /**
@@ -146,15 +179,37 @@ export class AgentClient {
     toAddress: string;
     targetChain?: "ethereum" | "polygon" | "arbitrum" | "base";
   }) {
-    return await bridgeTokenTool.func({
+    const startTime = Date.now();
+    const targetChain = params.targetChain ?? "ethereum";
+    const fromNetwork = this.network === "mainnet" ? "stellar-mainnet" : "stellar-testnet";
+    
+    // Start tracking the transaction
+    const transactionId = this.analytics.startTransaction('bridge', {
+      fromNetwork,
+      toNetwork: targetChain,
       amount: params.amount,
-      toAddress: params.toAddress,
-      targetChain: params.targetChain ?? "ethereum",
-      fromNetwork:
-        this.network === "mainnet"
-          ? "stellar-mainnet"
-          : "stellar-testnet",
+      asset: 'USDC', // Default asset for bridging
+      targetAddress: params.toAddress
     });
+
+    try {
+      const result = await bridgeTokenTool.func({
+        amount: params.amount,
+        toAddress: params.toAddress,
+        targetChain,
+        fromNetwork,
+      });
+
+      // Complete the transaction tracking
+      const executionTime = Date.now() - startTime;
+      this.analytics.completeTransaction(transactionId, result, executionTime);
+
+      return result;
+    } catch (error) {
+      // Mark the transaction as failed
+      this.analytics.failTransaction(transactionId, error);
+      throw error;
+    }
   }
 
   /**
@@ -169,15 +224,38 @@ export class AgentClient {
       minB: string;
       contractAddress?: string;
     }) => {
-      return await contractDeposit(
-        this.publicKey,
-        params.to,
-        params.desiredA,
-        params.minA,
-        params.desiredB,
-        params.minB,
-        { network: this.network, rpcUrl: this.rpcUrl, contractAddress: params.contractAddress }
-      );
+      const startTime = Date.now();
+      
+      // Start tracking the transaction
+      const transactionId = this.analytics.startTransaction('lp_deposit', {
+        poolAddress: params.contractAddress || 'default',
+        tokenA: 'A', // Simplified - would need actual token identification
+        tokenB: 'B',
+        amountA: params.desiredA,
+        amountB: params.desiredB
+      });
+
+      try {
+        const result = await contractDeposit(
+          this.publicKey,
+          params.to,
+          params.desiredA,
+          params.minA,
+          params.desiredB,
+          params.minB,
+          { network: this.network, rpcUrl: this.rpcUrl, contractAddress: params.contractAddress }
+        );
+
+        // Complete the transaction tracking
+        const executionTime = Date.now() - startTime;
+        this.analytics.completeTransaction(transactionId, result, executionTime);
+
+        return result;
+      } catch (error) {
+        // Mark the transaction as failed
+        this.analytics.failTransaction(transactionId, error);
+        throw error;
+      }
     },
 
     withdraw: async (params: {
@@ -187,14 +265,38 @@ export class AgentClient {
       minB: string;
       contractAddress?: string;
     }) => {
-      return await contractWithdraw(
-        this.publicKey,
-        params.to,
-        params.shareAmount,
-        params.minA,
-        params.minB,
-        { network: this.network, rpcUrl: this.rpcUrl, contractAddress: params.contractAddress }
-      );
+      const startTime = Date.now();
+      
+      // Start tracking the transaction
+      const transactionId = this.analytics.startTransaction('lp_withdraw', {
+        poolAddress: params.contractAddress || 'default',
+        tokenA: 'A', // Simplified - would need actual token identification
+        tokenB: 'B',
+        amountA: params.minA,
+        amountB: params.minB,
+        shareAmount: params.shareAmount
+      });
+
+      try {
+        const result = await contractWithdraw(
+          this.publicKey,
+          params.to,
+          params.shareAmount,
+          params.minA,
+          params.minB,
+          { network: this.network, rpcUrl: this.rpcUrl, contractAddress: params.contractAddress }
+        );
+
+        // Complete the transaction tracking
+        const executionTime = Date.now() - startTime;
+        this.analytics.completeTransaction(transactionId, result, executionTime);
+
+        return result;
+      } catch (error) {
+        // Mark the transaction as failed
+        this.analytics.failTransaction(transactionId, error);
+        throw error;
+      }
     },
 
     getReserves: async (params?: { contractAddress?: string }) => {
@@ -253,10 +355,12 @@ export class AgentClient {
    * @returns Transaction hash and asset details
    */
   async launchToken(params: LaunchTokenParams): Promise<LaunchTokenResult> {
-    // 🔒 SECURITY: Additional mainnet safeguard for token launches
+    const startTime = Date.now();
+    
+    // Security check for mainnet
     if (this.network === "mainnet") {
       throw new Error(
-        "🚫 Token launches on mainnet are disabled for security.\n" +
+        "Token launches on mainnet are disabled for security.\n" +
         "This prevents accidental creation of assets on the live network.\n" +
         "Token launches should be thoroughly tested on testnet first."
       );
@@ -270,6 +374,15 @@ export class AgentClient {
       decimals = 7,
       lockIssuer = false
     } = params;
+
+    // Start tracking the transaction
+    const transactionId = this.analytics.startTransaction('token_launch', {
+      tokenCode: code,
+      issuer: 'hidden', // Don't log secrets
+      distributor: 'hidden',
+      initialSupply,
+      issuerLocked: lockIssuer
+    });
 
     // 🔒 SECURITY: Validate inputs before processing
     if (!code || code.length === 0 || code.length > 12) {
@@ -386,8 +499,7 @@ export class AgentClient {
 
       // Return the final transaction hash (payment or lock transaction)
       const finalTransactionHash = lockResult?.hash || paymentResult.hash;
-
-      return {
+      const result = {
         transactionHash: finalTransactionHash,
         asset: {
           code: code,
@@ -397,7 +509,15 @@ export class AgentClient {
         issuerLocked: lockIssuer
       };
 
+      // Complete the transaction tracking
+      const executionTime = Date.now() - startTime;
+      this.analytics.completeTransaction(transactionId, result, executionTime);
+
+      return result;
+
     } catch (error) {
+      // Mark the transaction as failed
+      this.analytics.failTransaction(transactionId, error);
       console.error("Token launch failed:", error);
       throw new Error(`Token launch failed: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -527,4 +647,83 @@ export class AgentClient {
       throw new Error(`Failed to lock issuer account: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
+
+  /**
+   * Transaction Analytics and Performance Metrics API
+   * 
+   * Provides comprehensive tracking and analysis of all transaction performance,
+   * including swaps, bridges, and liquidity pool operations.
+   */
+  public metrics = {
+    /**
+     * Get a performance summary of all transactions
+     * 
+     * @returns PerformanceSummary object with key metrics like total volume, success rate, and average slippage
+     * 
+     * @example
+     * const summary = await agent.metrics.summary();
+     * console.log(`Total Volume: ${summary.totalVolume}`);
+     * console.log(`Success Rate: ${summary.successRate}`);
+     * console.log(`Average Slippage: ${summary.swapMetrics?.averageSlippage}`);
+     */
+    summary: (): PerformanceSummary => {
+      return this.analytics.getSummary();
+    },
+
+    /**
+     * Get detailed analytics with filtering options
+     * 
+     * @param filter Optional filtering criteria
+     * @returns DetailedAnalytics object with comprehensive insights
+     * 
+     * @example
+     * const analytics = await agent.metrics.detailed({
+     *   type: 'swap',
+     *   startDate: new Date('2024-01-01'),
+     *   asset: 'USDC'
+     * });
+     */
+    detailed: (filter?: FilterOptions): DetailedAnalytics => {
+      return this.analytics.getDetailedAnalytics(filter);
+    },
+
+    /**
+     * Get raw transaction data with optional filtering
+     * 
+     * @param filter Optional filtering criteria
+     * @returns Array of TransactionMetrics objects
+     * 
+     * @example
+     * const transactions = await agent.metrics.getTransactions({
+     *   status: 'failed',
+     *   limit: 10
+     * });
+     */
+    getTransactions: (filter?: FilterOptions) => {
+      return this.analytics.getTransactions(filter);
+    },
+
+    /**
+     * Export all analytics data to JSON format
+     * 
+     * @returns JSON string containing all analytics data
+     * 
+     * @example
+     * const exportData = await agent.metrics.export();
+     * fs.writeFileSync('analytics-backup.json', exportData);
+     */
+    export: (): string => {
+      return this.analytics.exportData();
+    },
+
+    /**
+     * Clean up old transaction data based on retention policy
+     * 
+     * @example
+     * await agent.metrics.cleanup();
+     */
+    cleanup: (): void => {
+      this.analytics.cleanup();
+    }
+  };
 }

@@ -14,12 +14,13 @@ multiple operations into a single programmable and extensible toolkit.
 
 ---
 
-## ✨ Features
+## Features
 
 - Token swaps on Stellar
 - Cross-chain bridging
 - Liquidity pool (LP) deposits & withdrawals
 - Querying pool reserves and share IDs
+- **Transaction Analytics & Performance Metrics** - Historical tracking, performance insights, debugging visibility, and risk analytics
 - Custom contract integrations (current)
 - Designed for future LP provider integrations
 - Supports Testnet & Mainnet
@@ -354,7 +355,98 @@ node test/bridge-tests.mjs
 
 ---
 
-## 🛡️ Security & Safety
+## � Analytics & Performance Metrics
+
+AgentKit includes comprehensive transaction analytics and performance metrics to provide deep insights into your DeFi operations.
+
+### Quick Start
+
+```typescript
+import { AgentClient } from "stellar-agentkit";
+
+const agent = new AgentClient({ network: "testnet" });
+
+// Execute transactions (automatically tracked)
+await agent.swap({
+  to: "GD...destination",
+  buyA: true,
+  out: "1000",
+  inMax: "1100"
+});
+
+// Get performance summary
+const summary = agent.metrics.summary();
+console.log(`Total Volume: ${summary.totalVolume}`);
+console.log(`Success Rate: ${summary.successRate}`);
+console.log(`Average Slippage: ${summary.swapMetrics?.averageSlippage}`);
+```
+
+### Key Features
+
+- **Historical Tracking**: All transactions automatically tracked and stored
+- **Performance Insights**: Execution time, slippage, and success rate analysis
+- **Debugging Visibility**: Complete transaction history with error analysis
+- **Risk Analytics**: Comprehensive risk metrics and performance patterns
+
+### Available Metrics
+
+```typescript
+interface PerformanceSummary {
+  totalTransactions: number;
+  successfulTransactions: number;
+  failedTransactions: number;
+  successRate: string;
+  totalVolume: string;
+  averageExecutionTime: number;
+  
+  swapMetrics?: {
+    totalSwaps: number;
+    totalSwapVolume: string;
+    averageSlippage: string;
+    bestSlippage: string;
+    worstSlippage: string;
+  };
+  
+  bridgeMetrics?: {
+    totalBridges: number;
+    totalBridgeVolume: string;
+    averageBridgeFee: string;
+    mostUsedTargetChain: string;
+  };
+  
+  // ... more metrics
+}
+```
+
+### Use Cases
+
+1. **Trading Dashboards**: Real-time performance monitoring
+2. **Trading Insights**: Analyze patterns and optimize strategies
+3. **Debugging**: Quick issue identification and resolution
+4. **Risk Analytics**: Monitor risk metrics and set alerts
+
+### Advanced Usage
+
+```typescript
+// Get detailed analytics with filtering
+const detailed = agent.metrics.detailed({
+  type: 'swap',
+  startDate: new Date('2024-01-01')
+});
+
+// Export data for backup
+const exportData = agent.metrics.export();
+fs.writeFileSync('analytics-backup.json', exportData);
+
+// Clean up old data
+agent.metrics.cleanup();
+```
+
+For detailed documentation, see [Analytics Documentation](./docs/analytics.md).
+
+---
+
+## �🛡️ Security & Safety
 
 ### Mainnet Safeguards
 
