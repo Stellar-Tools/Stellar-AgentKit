@@ -24,6 +24,7 @@ import {
   Networks,
   BASE_FEE
 } from "@stellar/stellar-sdk";
+import { createLogger, type Logger } from "./utils/logger";
 
 const { Server } = Horizon;
 
@@ -72,10 +73,17 @@ export class AgentClient {
   private network: "testnet" | "mainnet";
   private publicKey: string;
   private rpcUrl: string;
+  private logger: Logger;
 
   constructor(config: AgentConfig) {
+    this.logger = createLogger("AgentClient");
+
     // Mainnet safety check for general operations
     if (config.network === "mainnet" && !config.allowMainnet) {
+      this.logger.error("Mainnet execution blocked for safety", undefined, {
+        network: config.network,
+        allowMainnet: config.allowMainnet,
+      });
       throw new Error(
         "🚫 Mainnet execution blocked for safety.\n" +
         "Stellar AgentKit requires explicit opt-in for mainnet operations to prevent accidental use of real funds.\n" +
@@ -86,6 +94,10 @@ export class AgentClient {
 
     // Warning for mainnet usage (when opted in)
     if (config.network === "mainnet" && config.allowMainnet) {
+      this.logger.warn("Mainnet execution enabled - real funds will be used", {
+        network: config.network,
+        publicKey: config.publicKey ? `${config.publicKey.slice(0, 8)}...` : undefined,
+      });
       console.warn(
         "\n⚠️  WARNING: STELLAR MAINNET ACTIVE ⚠️\n" +
         "You are executing transactions on Stellar mainnet.\n" +
@@ -98,6 +110,13 @@ export class AgentClient {
     this.rpcUrl = config.rpcUrl || (config.network === "mainnet" 
       ? "https://horizon.stellar.org" 
       : "https://horizon-testnet.stellar.org");
+
+    this.logger.info("AgentClient initialized", {
+      network: this.network,
+      publicKey: this.publicKey ? `${this.publicKey.slice(0, 8)}...` : undefined,
+      rpcUrl: this.rpcUrl,
+      allowMainnet: config.allowMainnet,
+    });
     
     if (!this.publicKey && this.network === "testnet") {
         // In a real SDK, we might not throw here if only read-only methods are used,
@@ -116,14 +135,40 @@ export class AgentClient {
     inMax: string;
     contractAddress?: string;
   }) {
-    return await contractSwap(
-      this.publicKey,
-      params.to,
-      params.buyA,
-      params.out,
-      params.inMax,
-      { network: this.network, rpcUrl: this.rpcUrl, contractAddress: params.contractAddress }
-    );
+    this.logger.info("Swap operation initiated", {
+      to: params.to,
+      buyA: params.buyA,
+      out: params.out,
+      inMax: params.inMax,
+      contractAddress: params.contractAddress,
+      network: this.network,
+    });
+
+    try {
+      const result = await contractSwap(
+        this.publicKey,
+        params.to,
+        params.buyA,
+        params.out,
+        params.inMax,
+        { network: this.network, rpcUrl: this.rpcUrl, contractAddress: params.contractAddress }
+      );
+
+      this.logger.info("Swap operation completed", {
+        to: params.to,
+        result: typeof result === 'object' ? 'success' : result,
+        network: this.network,
+      });
+
+      return result;
+    } catch (error) {
+      this.logger.error("Swap operation failed", error as Error, {
+        to: params.to,
+        buyA: params.buyA,
+        network: this.network,
+      });
+      throw error;
+    }
   }
 
   /**
@@ -146,15 +191,46 @@ export class AgentClient {
     toAddress: string;
     targetChain?: "ethereum" | "polygon" | "arbitrum" | "base";
   }) {
-    return await bridgeTokenTool.func({
+    const targetChain = params.targetChain ?? "ethereum";
+    const fromNetwork = this.network === "mainnet" ? "stellar-mainnet" : "stellar-testnet";
+
+    this.logger.info("Bridge operation initiated", {
       amount: params.amount,
       toAddress: params.toAddress,
-      targetChain: params.targetChain ?? "ethereum",
-      fromNetwork:
-        this.network === "mainnet"
-          ? "stellar-mainnet"
-          : "stellar-testnet",
+      targetChain,
+      fromNetwork,
+      network: this.network,
     });
+
+    try {
+      const result = await bridgeTokenTool.func({
+        amount: params.amount,
+        toAddress: params.toAddress,
+        targetChain,
+        fromNetwork,
+      });
+
+      this.logger.info("Bridge operation completed", {
+        amount: params.amount,
+        toAddress: params.toAddress,
+        targetChain,
+        fromNetwork,
+        status: result.status,
+        hash: result.hash,
+        network: this.network,
+      });
+
+      return result;
+    } catch (error) {
+      this.logger.error("Bridge operation failed", error as Error, {
+        amount: params.amount,
+        toAddress: params.toAddress,
+        targetChain,
+        fromNetwork,
+        network: this.network,
+      });
+      throw error;
+    }
   }
 
   /**

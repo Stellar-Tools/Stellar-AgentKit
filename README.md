@@ -375,6 +375,104 @@ Bridging operations are **irreversible** and involve **cross-chain transfers**. 
 
 ---
 
+## 📄 Logging System
+
+AgentKit includes a comprehensive logging system designed for debugging, monitoring, and auditing financial operations.
+
+### Basic Usage
+
+```typescript
+import { createLogger, Logger } from "./utils/logger";
+
+// Create a logger for your module
+const logger = createLogger("MyModule");
+
+// Basic logging
+logger.info("Operation started", { amount: "100", asset: "USDC" });
+logger.warn("Low liquidity detected", { pool: "USDC-EURC" });
+logger.error("Transaction failed", error, { txId: "abc123" });
+```
+
+### Configuration
+
+```typescript
+import { Logger } from "./utils/logger";
+
+// Global configuration for all loggers
+Logger.configure({
+  level: "info", // debug, info, warn, error
+  enableConsole: true,
+  enableStructuredOutput: false, // Set to true for JSON output
+  sanitizeSensitiveData: true,  // Auto-redact sensitive data
+  includeStackTrace: false,      // Include stack traces in errors
+});
+```
+
+### Specialized Logging Methods
+
+The logging system provides specialized methods for Stellar operations:
+
+```typescript
+// Transaction logging
+logger.logTransaction("swap", "tx_123", "testnet", {
+  fromAsset: "USDC",
+  toAsset: "EURC",
+  amount: "100"
+});
+
+// DEX operations
+logger.logDexOperation("quote", { sendAsset: "USDC", destAsset: "EURC" }, {
+  destAmount: "85.50",
+  price: "0.855"
+});
+
+// Bridge operations
+logger.logBridgeOperation("initiated", {
+  amount: "100",
+  targetChain: "ethereum"
+});
+
+// Liquidity pool operations
+logger.logLPOperation("deposit", { pool: "USDC-EURC", amount: "100" });
+
+// Token launch operations
+logger.logTokenLaunch("creation", "MYTOKEN", { issuer: "GABC123..." });
+```
+
+### Security Features
+
+**Automatic Data Sanitization:**
+- Private keys, secrets, passwords, and API keys are automatically redacted
+- Public keys and addresses are partially shown for identification
+- Nested objects are recursively sanitized
+
+**Example:**
+```typescript
+logger.info("User operation", {
+  publicKey: "GABC123DEF456...",     // Shown (public)
+  privateKey: "SSECRET123...",        // Redacted to [REDACTED]
+  password: "secret123",              // Redacted to [REDACTED]
+  normalField: "visible"              // Shown
+});
+```
+
+### Production Usage
+
+For production environments, enable structured JSON output:
+
+```typescript
+Logger.configure({
+  level: "warn",
+  enableStructuredOutput: true, // JSON format for log aggregation
+  sanitizeSensitiveData: true,
+  includeStackTrace: true,
+});
+```
+
+This produces structured logs compatible with log aggregation systems like ELK, Datadog, or CloudWatch.
+
+---
+
 ## 📄 License
 
 [Add your license here]

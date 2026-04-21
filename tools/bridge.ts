@@ -18,11 +18,13 @@ import { buildTransactionFromXDR } from "../utils/buildTransaction";
 import * as dotenv from "dotenv";
 import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
+import { createLogger } from "../utils/logger";
 
 dotenv.config({ path: ".env" });
 
 const fromAddress = process.env.STELLAR_PUBLIC_KEY as string;
 const privateKey = process.env.STELLAR_PRIVATE_KEY as string;
+const logger = createLogger("BridgeTool");
 
 type StellarNetwork = "stellar-testnet" | "stellar-mainnet";
 
@@ -78,11 +80,22 @@ export const bridgeTokenTool = new DynamicStructuredTool({
     fromNetwork: StellarNetwork;
     targetChain: TargetChain;
   }) => {
+    logger.info("Bridge operation started", {
+      amount,
+      toAddress: `${toAddress.slice(0, 8)}...`,
+      fromNetwork,
+      targetChain,
+    });
+
     // Mainnet safeguard - additional layer beyond AgentClient
     if (
       fromNetwork === "stellar-mainnet" &&
       process.env.ALLOW_MAINNET_BRIDGE !== "true"
     ) {
+      logger.error("Mainnet bridge blocked by environment safeguard", undefined, {
+        fromNetwork,
+        targetChain,
+      });
       throw new Error(
         "Mainnet bridging is disabled. Set ALLOW_MAINNET_BRIDGE=true in your .env file to enable."
       );
