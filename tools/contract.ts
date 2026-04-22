@@ -20,7 +20,7 @@ function getStellarNetwork(): "testnet" | "mainnet" {
   return net === "mainnet" ? "mainnet" : "testnet";
 }
 function getSorobanRpcUrl(): string {
-  return process.env.SOROBAN_RPC_URL ?? "https://soroban-testnet.stellar.org";
+  return process.env.SOROBAN_RPC_URL || "https://soroban-testnet.stellar.org";
 }
 
 const schema = z.object({
