@@ -8,33 +8,45 @@ import {
   getReserves,
 } from "../lib/contract";
 
-// Assuming env variables are already loaded elsewhere
-const STELLAR_PUBLIC_KEY = process.env.STELLAR_PUBLIC_KEY!;
-const STELLAR_NETWORK = (process.env.STELLAR_NETWORK as "testnet" | "mainnet") || "testnet";
-const SOROBAN_RPC_URL = process.env.SOROBAN_RPC_URL || "https://soroban-testnet.stellar.org";
-
-if (!STELLAR_PUBLIC_KEY) {
-  throw new Error("Missing Stellar environment variables");
+// Lazy getters — defer env-var checks to invocation time so that importing
+// this module doesn't crash consumers without a fully configured environment.
+function getStellarPublicKey(): string {
+  const key = process.env.STELLAR_PUBLIC_KEY;
+  if (!key) throw new Error("Missing STELLAR_PUBLIC_KEY environment variable");
+  return key;
 }
+function getStellarNetwork(): "testnet" | "mainnet" {
+  const net = process.env.STELLAR_NETWORK;
+  return net === "mainnet" ? "mainnet" : "testnet";
+}
+function getSorobanRpcUrl(): string {
+  return process.env.SOROBAN_RPC_URL ?? "https://soroban-testnet.stellar.org";
+}
+
+const schema = z.object({
+  action: z.enum(["get_share_id", "deposit", "swap", "withdraw", "get_reserves"]),
+  to: z.string().optional(),
+  desiredA: z.string().optional(),
+  minA: z.string().optional(),
+  desiredB: z.string().optional(),
+  minB: z.string().optional(),
+  buyA: z.boolean().optional(),
+  out: z.string().optional(),
+  inMax: z.string().optional(),
+  shareAmount: z.string().optional(),
+  contractAddress: z.string().optional(),
+});
 
 export const StellarLiquidityContractTool = new DynamicStructuredTool({
   name: "stellar_liquidity_contract_tool",
   description:
     "Interact with a liquidity contract on Stellar Soroban: getShareId, deposit, swap, withdraw, getReserves.",
-  schema: z.object({
-    action: z.enum(["get_share_id", "deposit", "swap", "withdraw", "get_reserves"]),
-    to: z.string().optional(), // For deposit, swap, withdraw
-    desiredA: z.string().optional(), // For deposit
-    minA: z.string().optional(), // For deposit, withdraw
-    desiredB: z.string().optional(), // For deposit
-    minB: z.string().optional(), // For deposit, withdraw
-    buyA: z.boolean().optional(), // For swap
-    out: z.string().optional(), // For swap
-    inMax: z.string().optional(), // For swap
-    shareAmount: z.string().optional(), // For withdraw
-    contractAddress: z.string().optional(), // For overriding default pool on mainnet
-  }),
-  func: async (input: any) => {
+  schema,
+  func: async (input: z.infer<typeof schema>) => {
+    const STELLAR_PUBLIC_KEY = getStellarPublicKey();
+    const STELLAR_NETWORK    = getStellarNetwork();
+    const SOROBAN_RPC_URL    = getSorobanRpcUrl();
+
     const {
       action,
       to,
@@ -48,11 +60,11 @@ export const StellarLiquidityContractTool = new DynamicStructuredTool({
       shareAmount,
       contractAddress,
     } = input;
-    
+
     const config = {
       network: STELLAR_NETWORK,
       rpcUrl: SOROBAN_RPC_URL,
-      contractAddress,
+      ...(contractAddress && { contractAddress }),
     };
     
     try {
@@ -66,14 +78,18 @@ export const StellarLiquidityContractTool = new DynamicStructuredTool({
             throw new Error("to, desiredA, minA, desiredB, and minB are required for deposit");
           }
           const result = await deposit(STELLAR_PUBLIC_KEY, to, desiredA, minA, desiredB, minB, config);
-          return result ??`Deposited successfully to ${to}.`;
+          return result
+            ? `Deposited to ${to}: ${JSON.stringify(result)}`
+            : "Deposit returned no value.";
         }
         case "swap": {
-          if (!to || buyA === undefined || !out || !inMax) {
+          if (!to || buyA == null || !out || !inMax) {
             throw new Error("to, buyA, out, and inMax are required for swap");
           }
-          const result=await swap(STELLAR_PUBLIC_KEY, to, buyA, out, inMax, config);
-          return result ?? `Swapped successfully to ${to}.`;
+          const result = await swap(STELLAR_PUBLIC_KEY, to, buyA, out, inMax, config);
+          return result
+            ? `Swapped to ${to}: ${JSON.stringify(result)}`
+            : "Swap returned no value.";
         }
         case "withdraw": {
           if (!to || !shareAmount || !minA || !minB) {
