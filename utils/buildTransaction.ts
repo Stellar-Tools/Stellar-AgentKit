@@ -1,6 +1,6 @@
 import {
   Contract,
-  rpc,
+  FeeBumpTransaction,
   TransactionBuilder,
   Account,
   Asset,
@@ -18,6 +18,13 @@ interface BuildTransactionConfig {
   fee?: string;
   timeout?: number;
   memo?: string;
+  /**
+   * Network passphrase for the transaction envelope.
+   * Required — must be Networks.TESTNET or Networks.PUBLIC.
+   * Providing the wrong value causes the Soroban RPC to reject
+   * the transaction immediately (signature mismatch on the envelope).
+   */
+  networkPassphrase: string;
 }
 
 /**
@@ -47,42 +54,43 @@ interface PathPaymentOperationParams {
 }
 
 /**
- * Unified transaction builder for Stellar operations
+ * Unified transaction builder for Stellar operations.
  *
  * This function provides a single entry point for building transactions across
- * different operation types (swap, LP, bridge), normalizing fee, timeout, and memo logic.
+ * different operation types (swap, LP, bridge, stake), normalising fee,
+ * timeout, memo, and — critically — the network passphrase.
  *
- * @param operationType - The type of operation: "swap" | "lp" | "bridge"
- * @param sourceAccount - The source account for the transaction
+ * @param operationType    - The type of operation: "swap" | "lp" | "bridge" | "stake"
+ * @param sourceAccount    - The source account for the transaction
  * @param sorobanOperation - Parameters for the Soroban contract operation
- * @param config - Optional configuration for fee, timeout, and memo
+ * @param config           - Configuration; networkPassphrase is required
  * @returns A built transaction ready for simulation or signing
+ *
+ * @example
+ * // Mainnet usage — always pass the correct passphrase:
+ * const tx = buildTransaction("lp", account, op, {
+ *   networkPassphrase: Networks.PUBLIC,
+ * });
  */
 export function buildTransaction(
   operationType: OperationType,
   sourceAccount: Account,
   sorobanOperation: SorobanOperationParams,
-  config: BuildTransactionConfig = {}
-): any {
-  // Normalize configuration with sensible defaults per operation type
-  const fee = config.fee || BASE_FEE;
-  const timeout = config.timeout !== undefined ? config.timeout : getDefaultTimeout(operationType);
-  const memo = config.memo;
+  config: BuildTransactionConfig
+): Transaction {
+  const fee               = config.fee ?? BASE_FEE;
+  const timeout           = config.timeout !== undefined ? config.timeout : getDefaultTimeout(operationType);
+  const memo              = config.memo;
+  const networkPassphrase = config.networkPassphrase;
+  const memoValue         = memo ? Memo.text(memo) : undefined;
 
-  // Build transaction parameters
-  const networkPassphrase = Networks.TESTNET;
-  const memoValue = memo ? Memo.text(memo) : undefined;
-  const params = {
+  const builder = new TransactionBuilder(sourceAccount, {
     fee,
     networkPassphrase,
     memo: memoValue,
-  };
+  });
 
-  // Build the transaction
-  const builder = new TransactionBuilder(sourceAccount, params);
-
-  // Add the Soroban contract operation
-  if (sorobanOperation.args) {
+  if (sorobanOperation.args && sorobanOperation.args.length > 0) {
     builder.addOperation(
       sorobanOperation.contract.call(
         sorobanOperation.functionName,
@@ -95,12 +103,8 @@ export function buildTransaction(
     );
   }
 
-  // Set timeout
   builder.setTimeout(timeout);
-
-  // Build and return the transaction
-  const transaction = builder.build();
-  return transaction;
+  return builder.build();
 }
 
 /**
@@ -117,30 +121,29 @@ export function buildTransaction(
  * @returns A transaction object reconstructed from XDR
  */
 export function buildTransactionFromXDR(
-  operationType: OperationType,
+  _operationType: OperationType,
   xdrTx: string,
   networkPassphrase: string,
-  config: BuildTransactionConfig = {}
-): any {
-  // Reconstruct the transaction from XDR
+  config: Pick<BuildTransactionConfig, "memo"> = {}
+): Transaction | FeeBumpTransaction {
   const transaction = TransactionBuilder.fromXDR(xdrTx, networkPassphrase);
-  
-  // Note: Fee and timeout are already set in the XDR by external SDKs
-  // We only apply memo if provided and not already in the transaction
-  if (config.memo) {
-    (transaction as Transaction).memo = Memo.text(config.memo);
+
+  // Only mutate memo on a regular Transaction — FeeBumpTransaction wraps an
+  // inner transaction and does not expose .memo directly, so mutating it is
+  // either a silent no-op or a runtime error depending on SDK version.
+  if (config.memo && transaction instanceof Transaction) {
+    transaction.memo = Memo.text(config.memo);
   }
 
   return transaction;
-
 }
 
 export function buildPathPaymentTransaction(
   sourceAccount: Account,
   operation: PathPaymentOperationParams,
-  config: BuildTransactionConfig & { networkPassphrase: string }
+  config: BuildTransactionConfig
 ): Transaction {
-  const fee = config.fee || BASE_FEE;
+  const fee = config.fee ?? BASE_FEE;
   const timeout = config.timeout !== undefined ? config.timeout : 300;
   const memo = config.memo ? Memo.text(config.memo) : undefined;
 
@@ -193,6 +196,7 @@ export function buildPathPaymentTransaction(
  * - swap: 300 seconds (5 minutes)
  * - lp (LP operations): 300 seconds (5 minutes)
  * - bridge: 300 seconds (5 minutes)
+ * - stake: 300 seconds (5 minutes)
  *
  * @param operationType - The type of operation
  * @returns The timeout in seconds
@@ -209,7 +213,7 @@ function getDefaultTimeout(operationType: OperationType): number {
       return 300;
     default:
       const _exhaustive: never = operationType;
-      return _exhaustive;
+      throw new Error(`Unhandled operation type: ${_exhaustive}`);
   }
 }
 
