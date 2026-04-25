@@ -142,7 +142,7 @@ export async function executeSwap(params: {
   function routeMatchesInputs(route: RouteQuote): boolean {
     const expectedAmount = params.mode === "strict-send" ? params.sendAmount! : params.destAmount!;
     const routeAmount = params.mode === "strict-send" ? route.sendAmount : route.destAmount;
-    return routeAmount === expectedAmount;
+    return Math.abs(parseFloat(routeAmount) - parseFloat(expectedAmount)) < 1e-7;
   }
 
   let best: RouteQuote;

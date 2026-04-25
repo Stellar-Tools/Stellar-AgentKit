@@ -193,7 +193,7 @@ export default function SwapPanel() {
             <input
               type="number"
               min="0"
-              max="5000"
+              max="10000"
               value={slippageBps}
               onChange={(e) => setSlippageBps(e.target.value)}
             />
