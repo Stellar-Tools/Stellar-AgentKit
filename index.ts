@@ -15,6 +15,14 @@ import type {
   RouteQuote,
   SwapBestRouteParams,
   SwapBestRouteResult,
+  CreateClaimableBalanceParams,
+  CreateClaimableBalanceResult,
+  ClaimClaimableBalanceParams,
+  ClaimClaimableBalanceResult,
+  ListClaimableBalancesParams,
+  ClaimableBalanceRecord,
+  ClaimPredicate,
+  ClaimantInput,
 } from "./agent";
 
 export { 
@@ -30,6 +38,14 @@ export type {
   RouteQuote,
   SwapBestRouteParams,
   SwapBestRouteResult,
+  CreateClaimableBalanceParams,
+  CreateClaimableBalanceResult,
+  ClaimClaimableBalanceParams,
+  ClaimClaimableBalanceResult,
+  ListClaimableBalancesParams,
+  ClaimableBalanceRecord,
+  ClaimPredicate,
+  ClaimantInput,
 };
 export const stellarTools = [
   bridgeTokenTool,

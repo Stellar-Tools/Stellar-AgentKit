@@ -21,6 +21,7 @@ multiple operations into a single programmable and extensible toolkit.
 - Liquidity pool (LP) deposits & withdrawals
 - Querying pool reserves and share IDs
 - Custom contract integrations (current)
+- Claimable balances for conditional / time-locked payments (escrow & vesting)
 - Designed for future LP provider integrations
 - Supports Testnet & Mainnet
 
@@ -328,6 +329,57 @@ const reserves = await agent.lp.getReserves();
 // Get share token ID
 const shareId = await agent.lp.getShareId();
 ```
+
+---
+
+## 🔒 Claimable Balances (Conditional / Time-Locked Payments)
+
+Stellar's native primitive for **escrow, vesting, and scheduled payouts** —
+ideal for AI-agent workflows where funds must be released only when a
+predicate is satisfied.
+
+```typescript
+import { AgentClient } from "stellartools";
+
+const agent = new AgentClient({ network: "testnet" });
+
+// 1. Lock 100 XLM for `recipient`, claimable any time within the next 24h
+const created = await agent.claimable.create({
+  sourceSecret: process.env.SOURCE_SECRET!,
+  asset: { code: "XLM" },
+  amount: "100",
+  claimants: [
+    {
+      destination: "GRECIPIENT...",
+      predicate: { type: "beforeRelativeTime", seconds: 86400 },
+    },
+  ],
+});
+console.log(created.transactionHash, created.balanceIds);
+
+// 2. List claimable balances awaiting a specific account
+const open = await agent.claimable.list({ claimant: "GRECIPIENT..." });
+
+// 3. Claim a balance
+await agent.claimable.claim({
+  claimerSecret: process.env.RECIPIENT_SECRET!,
+  balanceId: created.balanceIds[0],
+});
+```
+
+**Supported predicates** (composable via `and` / `or` / `not`):
+
+| Type | Meaning |
+| --- | --- |
+| `unconditional` | Always claimable |
+| `beforeRelativeTime` | Claimable for N seconds after creation |
+| `beforeAbsoluteTime` | Claimable until a Unix epoch timestamp |
+| `not` | Negation of an inner predicate |
+| `and` / `or` | Logical combination of two inner predicates |
+
+Each input claimant becomes its own `CreateClaimableBalance` operation, so the
+returned `balanceIds` map 1:1 with `claimants`. Up to **10 claimants** per call
+(Stellar protocol limit).
 
 ---
 

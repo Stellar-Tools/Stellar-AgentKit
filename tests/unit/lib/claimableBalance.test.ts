@@ -1,0 +1,289 @@
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { Account, Keypair } from "@stellar/stellar-sdk";
+
+import {
+  buildPredicate,
+  createClaimableBalance,
+  claimClaimableBalance,
+  listClaimableBalances,
+  extractBalanceIdsFromTransactionResult,
+  type ClaimPredicate,
+} from "../../../lib/claimableBalance";
+
+const TESTNET_HORIZON = "https://horizon-testnet.stellar.org";
+
+// We avoid constructing a full xdr.TransactionResult in tests (the XDR union
+// builders for TransactionResultExt vary across SDK versions). Instead we
+// verify the extractor is robust to invalid input here, and let real-network
+// integration tests cover end-to-end parsing.
+
+describe("claimableBalance.buildPredicate", () => {
+  it("builds an unconditional predicate by default", () => {
+    expect(() => buildPredicate(undefined)).not.toThrow();
+    expect(() => buildPredicate({ type: "unconditional" })).not.toThrow();
+  });
+
+  it("validates relative-time predicates", () => {
+    expect(() =>
+      buildPredicate({ type: "beforeRelativeTime", seconds: 60 })
+    ).not.toThrow();
+    expect(() =>
+      buildPredicate({ type: "beforeRelativeTime", seconds: 0 })
+    ).toThrow(/positive integer/);
+    expect(() =>
+      buildPredicate({ type: "beforeRelativeTime", seconds: -1 as any })
+    ).toThrow(/positive integer/);
+  });
+
+  it("validates absolute-time predicates", () => {
+    expect(() =>
+      buildPredicate({ type: "beforeAbsoluteTime", epochSeconds: "1735689600" })
+    ).not.toThrow();
+    expect(() =>
+      buildPredicate({ type: "beforeAbsoluteTime", epochSeconds: "abc" as any })
+    ).toThrow(/positive integer/);
+  });
+
+  it("supports nested compound predicates", () => {
+    const predicate: ClaimPredicate = {
+      type: "and",
+      predicates: [
+        { type: "beforeRelativeTime", seconds: 100 },
+        { type: "not", predicate: { type: "unconditional" } },
+      ],
+    };
+    expect(() => buildPredicate(predicate)).not.toThrow();
+  });
+
+  it("rejects malformed compound predicates", () => {
+    expect(() =>
+      buildPredicate({ type: "and", predicates: [] as any })
+    ).toThrow(/exactly 2/);
+    expect(() => buildPredicate({ type: "not" } as any)).toThrow(/inner/);
+  });
+
+  it("guards against excessive nesting", () => {
+    let p: ClaimPredicate = { type: "unconditional" };
+    for (let i = 0; i < 8; i++) {
+      p = { type: "not", predicate: p };
+    }
+    expect(() => buildPredicate(p)).toThrow(/too deep/);
+  });
+});
+
+describe("claimableBalance.extractBalanceIdsFromTransactionResult", () => {
+  it("returns empty array on malformed XDR", () => {
+    expect(extractBalanceIdsFromTransactionResult("not-xdr")).toEqual([]);
+  });
+
+  it("returns empty array when result_xdr is missing", () => {
+    expect(extractBalanceIdsFromTransactionResult("")).toEqual([]);
+  });
+});
+
+describe("claimableBalance.createClaimableBalance", () => {
+  const sourceKp = Keypair.random();
+  const destKp = Keypair.random();
+  let loadAccountSpy: any;
+  let submitSpy: any;
+
+  beforeEach(() => {
+    const account = new Account(sourceKp.publicKey(), "1");
+    // Stub Horizon Server methods on the prototype.
+    const sdk = require("@stellar/stellar-sdk");
+    loadAccountSpy = vi
+      .spyOn(sdk.Horizon.Server.prototype as any, "loadAccount")
+      .mockResolvedValue(account);
+    submitSpy = vi
+      .spyOn(sdk.Horizon.Server.prototype as any, "submitTransaction")
+      .mockResolvedValue({
+        hash: "abc123",
+        // Empty result_xdr → balanceIds will be []. Real Horizon returns
+        // a populated XDR; integration tests cover end-to-end parsing.
+        result_xdr: "",
+      });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("validates inputs and rejects bad amount", async () => {
+    await expect(
+      createClaimableBalance(
+        { network: "testnet", horizonUrl: TESTNET_HORIZON },
+        {
+          sourceSecret: sourceKp.secret(),
+          asset: { code: "XLM" },
+          amount: "0",
+          claimants: [{ destination: destKp.publicKey() }],
+        }
+      )
+    ).rejects.toThrow(/greater than zero/);
+  });
+
+  it("rejects empty claimants list", async () => {
+    await expect(
+      createClaimableBalance(
+        { network: "testnet", horizonUrl: TESTNET_HORIZON },
+        {
+          sourceSecret: sourceKp.secret(),
+          asset: { code: "XLM" },
+          amount: "10",
+          claimants: [],
+        }
+      )
+    ).rejects.toThrow(/At least one claimant/);
+  });
+
+  it("rejects more than 10 claimants", async () => {
+    const claimants = Array.from({ length: 11 }, () => ({
+      destination: Keypair.random().publicKey(),
+    }));
+    await expect(
+      createClaimableBalance(
+        { network: "testnet", horizonUrl: TESTNET_HORIZON },
+        {
+          sourceSecret: sourceKp.secret(),
+          asset: { code: "XLM" },
+          amount: "10",
+          claimants,
+        }
+      )
+    ).rejects.toThrow(/at most 10/);
+  });
+
+  it("requires issuer for non-native asset", async () => {
+    await expect(
+      createClaimableBalance(
+        { network: "testnet", horizonUrl: TESTNET_HORIZON },
+        {
+          sourceSecret: sourceKp.secret(),
+          asset: { code: "USDC" },
+          amount: "10",
+          claimants: [{ destination: destKp.publicKey() }],
+        }
+      )
+    ).rejects.toThrow(/issuer/);
+  });
+
+  it("submits a signed tx and returns hash + balance ids", async () => {
+    const result = await createClaimableBalance(
+      { network: "testnet", horizonUrl: TESTNET_HORIZON },
+      {
+        sourceSecret: sourceKp.secret(),
+        asset: { code: "XLM" },
+        amount: "5",
+        claimants: [
+          {
+            destination: destKp.publicKey(),
+            predicate: { type: "beforeRelativeTime", seconds: 3600 },
+          },
+        ],
+      }
+    );
+
+    expect(result.transactionHash).toBe("abc123");
+    expect(Array.isArray(result.balanceIds)).toBe(true);
+    expect(loadAccountSpy).toHaveBeenCalledWith(sourceKp.publicKey());
+    expect(submitSpy).toHaveBeenCalledTimes(1);
+
+    // Verify the submitted tx was signed and contains a CreateClaimableBalance op.
+    const submittedTx = submitSpy.mock.calls[0][0];
+    expect(submittedTx.signatures.length).toBeGreaterThan(0);
+    expect(submittedTx.operations).toHaveLength(1);
+    expect(submittedTx.operations[0].type).toBe("createClaimableBalance");
+  });
+});
+
+describe("claimableBalance.claimClaimableBalance", () => {
+  const claimerKp = Keypair.random();
+  let loadAccountSpy: any;
+  let submitSpy: any;
+
+  beforeEach(() => {
+    const sdk = require("@stellar/stellar-sdk");
+    loadAccountSpy = vi
+      .spyOn(sdk.Horizon.Server.prototype as any, "loadAccount")
+      .mockResolvedValue(new Account(claimerKp.publicKey(), "1"));
+    submitSpy = vi
+      .spyOn(sdk.Horizon.Server.prototype as any, "submitTransaction")
+      .mockResolvedValue({ hash: "claim-hash", result_xdr: "" });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("rejects non-hex balance ids", async () => {
+    await expect(
+      claimClaimableBalance(
+        { network: "testnet", horizonUrl: TESTNET_HORIZON },
+        { claimerSecret: claimerKp.secret(), balanceId: "not-hex!" }
+      )
+    ).rejects.toThrow(/hex/);
+  });
+
+  it("submits a signed claim transaction", async () => {
+    const balanceId = "00000000" + "ab".repeat(32);
+    const result = await claimClaimableBalance(
+      { network: "testnet", horizonUrl: TESTNET_HORIZON },
+      { claimerSecret: claimerKp.secret(), balanceId }
+    );
+
+    expect(result.transactionHash).toBe("claim-hash");
+    expect(result.balanceId).toBe(balanceId);
+    const submittedTx = submitSpy.mock.calls[0][0];
+    expect(submittedTx.operations[0].type).toBe("claimClaimableBalance");
+  });
+});
+
+describe("claimableBalance.listClaimableBalances", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("queries Horizon with provided filters and maps records", async () => {
+    const sdk = require("@stellar/stellar-sdk");
+
+    const callBuilder: any = {
+      claimant: vi.fn().mockReturnThis(),
+      sponsor: vi.fn().mockReturnThis(),
+      asset: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      cursor: vi.fn().mockReturnThis(),
+      call: vi.fn().mockResolvedValue({
+        records: [
+          {
+            id: "00000000abc",
+            asset: "native",
+            amount: "10.0000000",
+            sponsor: "GSPONSOR",
+            last_modified_ledger: 42,
+            claimants: [
+              {
+                destination: "GDEST",
+                predicate: { unconditional: true },
+              },
+            ],
+          },
+        ],
+      }),
+    };
+
+    vi.spyOn(sdk.Horizon.Server.prototype as any, "claimableBalances").mockReturnValue(
+      callBuilder
+    );
+
+    const records = await listClaimableBalances(
+      { network: "testnet", horizonUrl: TESTNET_HORIZON },
+      { claimant: "GDEST", limit: 5 }
+    );
+
+    expect(callBuilder.claimant).toHaveBeenCalledWith("GDEST");
+    expect(callBuilder.limit).toHaveBeenCalledWith(5);
+    expect(records).toHaveLength(1);
+    expect(records[0].id).toBe("00000000abc");
+    expect(records[0].claimants[0].destination).toBe("GDEST");
+  });
+});

@@ -16,6 +16,19 @@ import {
 } from "./lib/dex";
 import { bridgeTokenTool } from "./tools/bridge";
 import {
+  createClaimableBalance as cbCreate,
+  claimClaimableBalance as cbClaim,
+  listClaimableBalances as cbList,
+  type CreateClaimableBalanceParams,
+  type CreateClaimableBalanceResult,
+  type ClaimClaimableBalanceParams,
+  type ClaimClaimableBalanceResult,
+  type ListClaimableBalancesParams,
+  type ClaimableBalanceRecord,
+  type ClaimPredicate,
+  type ClaimantInput,
+} from "./lib/claimableBalance";
+import {
   Horizon,
   Keypair,
   Asset,
@@ -66,6 +79,14 @@ export type {
   RouteQuote,
   SwapBestRouteParams,
   SwapBestRouteResult,
+  CreateClaimableBalanceParams,
+  CreateClaimableBalanceResult,
+  ClaimClaimableBalanceParams,
+  ClaimClaimableBalanceResult,
+  ListClaimableBalancesParams,
+  ClaimableBalanceRecord,
+  ClaimPredicate,
+  ClaimantInput,
 };
 
 export class AgentClient {
@@ -234,6 +255,52 @@ export class AgentClient {
           publicKey: this.publicKey,
         },
         params
+      );
+    },
+  };
+
+  /**
+   * Claimable Balances — conditional / time-locked payments (escrow, vesting,
+   * scheduled payouts). Useful for AI-agent workflows where funds must be
+   * released only when a predicate evaluates to true.
+   *
+   * @example
+   * // Lock 100 XLM for `recipient`, claimable after 24h
+   * await agent.claimable.create({
+   *   sourceSecret: process.env.SECRET!,
+   *   asset: { code: "XLM" },
+   *   amount: "100",
+   *   claimants: [{
+   *     destination: recipient,
+   *     predicate: { type: "beforeRelativeTime", seconds: 86400 },
+   *   }],
+   * });
+   */
+  public claimable = {
+    create: async (
+      params: CreateClaimableBalanceParams
+    ): Promise<CreateClaimableBalanceResult> => {
+      return await cbCreate(
+        { network: this.network, horizonUrl: this.rpcUrl },
+        params
+      );
+    },
+
+    claim: async (
+      params: ClaimClaimableBalanceParams
+    ): Promise<ClaimClaimableBalanceResult> => {
+      return await cbClaim(
+        { network: this.network, horizonUrl: this.rpcUrl },
+        params
+      );
+    },
+
+    list: async (
+      params?: ListClaimableBalancesParams
+    ): Promise<ClaimableBalanceRecord[]> => {
+      return await cbList(
+        { network: this.network, horizonUrl: this.rpcUrl },
+        params ?? {}
       );
     },
   };
