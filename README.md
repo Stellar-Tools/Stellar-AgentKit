@@ -378,8 +378,9 @@ await agent.claimable.claim({
 | `and` / `or` | Logical combination of two inner predicates |
 
 Each input claimant becomes its own `CreateClaimableBalance` operation, so the
-returned `balanceIds` map 1:1 with `claimants`. Up to **10 claimants** per call
-(Stellar protocol limit).
+returned `balanceIds` map 1:1 with `claimants`. Up to **100 operations per
+transaction** (Stellar protocol cap on operations per tx) — split larger batches
+across multiple calls.
 
 ---
 

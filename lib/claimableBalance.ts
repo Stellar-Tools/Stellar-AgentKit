@@ -90,7 +90,20 @@ export interface ClaimableBalanceRecord {
   claimants: Array<{ destination: string; predicate: unknown }>;
 }
 
-const MAX_CLAIMANTS = 10;
+/**
+ * Stellar's per-balance protocol limit on claimants for a single
+ * CreateClaimableBalance operation. We currently emit one operation per input
+ * claimant (so each resulting balance has exactly one claimant), meaning this
+ * constant is informational and NOT used to cap the input array length.
+ */
+export const MAX_CLAIMANTS_PER_BALANCE = 10;
+
+/**
+ * Stellar's protocol cap on operations per transaction. Since we emit one
+ * CreateClaimableBalance op per input claimant, this is the effective upper
+ * bound on the size of the `claimants` array in a single call.
+ */
+const MAX_OPERATIONS_PER_TRANSACTION = 100;
 
 function getNetworkPassphrase(network: NetworkName): string {
   return network === "mainnet" ? Networks.PUBLIC : Networks.TESTNET;
@@ -241,8 +254,11 @@ export async function createClaimableBalance(
   if (!params.claimants || params.claimants.length === 0) {
     throw new Error("At least one claimant is required");
   }
-  if (params.claimants.length > MAX_CLAIMANTS) {
-    throw new Error(`A claimable balance supports at most ${MAX_CLAIMANTS} claimants`);
+  if (params.claimants.length > MAX_OPERATIONS_PER_TRANSACTION) {
+    throw new Error(
+      `A single transaction supports at most ${MAX_OPERATIONS_PER_TRANSACTION} claimable-balance operations ` +
+        `(received ${params.claimants.length}). Split the request across multiple transactions.`
+    );
   }
   validateAmount(params.amount);
 

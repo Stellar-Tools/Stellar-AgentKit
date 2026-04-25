@@ -136,8 +136,26 @@ describe("claimableBalance.createClaimableBalance", () => {
     ).rejects.toThrow(/At least one claimant/);
   });
 
-  it("rejects more than 10 claimants", async () => {
-    const claimants = Array.from({ length: 11 }, () => ({
+  it("accepts more than 10 claimants (each becomes its own 1-claimant balance)", async () => {
+    const claimants = Array.from({ length: 25 }, () => ({
+      destination: Keypair.random().publicKey(),
+    }));
+    const result = await createClaimableBalance(
+      { network: "testnet", horizonUrl: TESTNET_HORIZON },
+      {
+        sourceSecret: sourceKp.secret(),
+        asset: { code: "XLM" },
+        amount: "10",
+        claimants,
+      }
+    );
+    expect(result.transactionHash).toBe("abc123");
+    const submittedTx = submitSpy.mock.calls[0][0];
+    expect(submittedTx.operations).toHaveLength(25);
+  });
+
+  it("rejects more than 100 ops per transaction (Stellar protocol cap)", async () => {
+    const claimants = Array.from({ length: 101 }, () => ({
       destination: Keypair.random().publicKey(),
     }));
     await expect(
@@ -150,7 +168,7 @@ describe("claimableBalance.createClaimableBalance", () => {
           claimants,
         }
       )
-    ).rejects.toThrow(/at most 10/);
+    ).rejects.toThrow(/at most 100/);
   });
 
   it("requires issuer for non-native asset", async () => {
