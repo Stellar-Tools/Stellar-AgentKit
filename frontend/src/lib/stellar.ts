@@ -127,14 +127,26 @@ export async function executeSwap(params: {
   if (!StellarSdk.StrKey.isValidEd25519PublicKey(params.address)) {
     throw new Error("Invalid wallet address.");
   }
+  if (params.mode === "strict-send" && !params.sendAmount) {
+    throw new Error("strict-send requires sendAmount.");
+  }
+  if (params.mode === "strict-receive" && !params.destAmount) {
+    throw new Error("strict-receive requires destAmount.");
+  }
 
   const server = new StellarSdk.Horizon.Server(HORIZON_TESTNET);
   const sendAsset = resolveAsset(params.sendAsset);
   const destAsset = resolveAsset(params.destAsset);
   const slippage = (params.slippageBps ?? 100) / 10000;
 
+  function routeMatchesInputs(route: RouteQuote): boolean {
+    const expectedAmount = params.mode === "strict-send" ? params.sendAmount! : params.destAmount!;
+    const routeAmount = params.mode === "strict-send" ? route.sendAmount : route.destAmount;
+    return routeAmount === expectedAmount;
+  }
+
   let best: RouteQuote;
-  if (params.route) {
+  if (params.route && routeMatchesInputs(params.route)) {
     best = params.route;
   } else {
     const quotes = await quoteSwap({

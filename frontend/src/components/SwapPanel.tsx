@@ -96,8 +96,8 @@ export default function SwapPanel() {
   async function handleSwap() {
     if (!address) return;
     const parsedSlippage = parseInt(slippageBps, 10);
-    if (isNaN(parsedSlippage) || parsedSlippage < 0) {
-      setResult({ ok: false, msg: "❌ Invalid slippage value." });
+    if (isNaN(parsedSlippage) || parsedSlippage < 0 || parsedSlippage > 10000) {
+      setResult({ ok: false, msg: "❌ Slippage must be between 0 and 10000 bps (0–100%)." });
       return;
     }
     setResult(null);
