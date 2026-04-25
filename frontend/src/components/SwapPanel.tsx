@@ -95,6 +95,11 @@ export default function SwapPanel() {
 
   async function handleSwap() {
     if (!address) return;
+    const parsedSlippage = parseInt(slippageBps, 10);
+    if (isNaN(parsedSlippage) || parsedSlippage < 0) {
+      setResult({ ok: false, msg: "❌ Invalid slippage value." });
+      return;
+    }
     setResult(null);
     setSwapLoading(true);
     try {
@@ -106,7 +111,8 @@ export default function SwapPanel() {
         destAsset: assetFormToInput(destAsset),
         sendAmount: mode === "strict-send" ? sendAmount : undefined,
         destAmount: mode === "strict-receive" ? destAmount : undefined,
-        slippageBps: parseInt(slippageBps, 10),
+        slippageBps: parsedSlippage,
+        route: selectedQuote !== null ? quotes[selectedQuote] : undefined,
       });
       setResult({ ok: true, msg: hash });
     } catch (err: any) {

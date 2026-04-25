@@ -57,6 +57,9 @@ export async function sendPayment(p: SendPaymentParams): Promise<string> {
   const signedXdr = await p.signXdr(tx.toXDR());
   const signedTx = new StellarSdk.Transaction(signedXdr, StellarSdk.Networks.TESTNET);
   const result = await server.submitTransaction(signedTx);
+  if (!result.successful) {
+    throw new Error(`Transaction failed (${result.hash})`);
+  }
   return result.hash;
 }
 
@@ -119,6 +122,7 @@ export async function executeSwap(params: {
   sendAmount?: string;
   destAmount?: string;
   slippageBps?: number;
+  route?: RouteQuote;
 }): Promise<string> {
   if (!StellarSdk.StrKey.isValidEd25519PublicKey(params.address)) {
     throw new Error("Invalid wallet address.");
@@ -129,17 +133,21 @@ export async function executeSwap(params: {
   const destAsset = resolveAsset(params.destAsset);
   const slippage = (params.slippageBps ?? 100) / 10000;
 
-  const quotes = await quoteSwap({
-    mode: params.mode,
-    sendAsset: params.sendAsset,
-    destAsset: params.destAsset,
-    sendAmount: params.sendAmount,
-    destAmount: params.destAmount,
-    limit: 1,
-  });
-
-  if (quotes.length === 0) throw new Error("No swap route found.");
-  const best = quotes[0];
+  let best: RouteQuote;
+  if (params.route) {
+    best = params.route;
+  } else {
+    const quotes = await quoteSwap({
+      mode: params.mode,
+      sendAsset: params.sendAsset,
+      destAsset: params.destAsset,
+      sendAmount: params.sendAmount,
+      destAmount: params.destAmount,
+      limit: 1,
+    });
+    if (quotes.length === 0) throw new Error("No swap route found.");
+    best = quotes[0];
+  }
 
   const intermediatePath = best.path.map(resolveAsset);
   const account = await server.loadAccount(params.address);
@@ -178,6 +186,9 @@ export async function executeSwap(params: {
   const signedXdr = await params.signXdr(tx.toXDR());
   const signedTx = new StellarSdk.Transaction(signedXdr, StellarSdk.Networks.TESTNET);
   const result = await server.submitTransaction(signedTx);
+  if (!result.successful) {
+    throw new Error(`Transaction failed (${result.hash})`);
+  }
   return result.hash;
 }
 
