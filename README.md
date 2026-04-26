@@ -20,6 +20,9 @@ multiple operations into a single programmable and extensible toolkit.
 - Cross-chain bridging
 - Liquidity pool (LP) deposits & withdrawals
 - Querying pool reserves and share IDs
+- **📊 Transaction analytics and performance metrics**
+- Historical tracking and debugging visibility
+- Risk analytics and insights
 - Custom contract integrations (current)
 - Designed for future LP provider integrations
 - Supports Testnet & Mainnet
@@ -327,6 +330,146 @@ const reserves = await agent.lp.getReserves();
 
 // Get share token ID
 const shareId = await agent.lp.getShareId();
+```
+
+---
+
+## 📊 Transaction Analytics & Performance Metrics
+
+AgentKit now includes comprehensive transaction analytics and performance metrics to provide insights into your DeFi operations.
+
+### 🎯 Key Features
+
+- **Historical Tracking**: All transactions are automatically tracked with timestamps, execution times, and status
+- **Performance Insights**: Monitor execution times, success rates, and gas usage patterns
+- **Risk Analytics**: Track failed transactions, error patterns, and slippage metrics
+- **Debugging Visibility**: Get detailed transaction data for troubleshooting
+
+### 📈 Metrics Summary API
+
+Get a comprehensive overview of your transaction performance:
+
+```typescript
+import { AgentClient } from "stellar-agentkit";
+
+const agent = new AgentClient({
+  network: "testnet",
+  publicKey: "YOUR_PUBLIC_KEY"
+});
+
+// Perform some transactions first...
+await agent.swap({
+  to: "recipient_address",
+  buyA: true,
+  out: "100",
+  inMax: "110"
+});
+
+// Get metrics summary
+const summary = agent.metrics.summary();
+console.log(summary);
+// {
+//   totalVolume: "10000",
+//   avgSlippage: "1.2%",
+//   successRate: "98%",
+//   totalTransactions: 25,
+//   avgExecutionTime: "1250ms",
+//   transactionTypes: {
+//     swaps: 15,
+//     bridges: 5,
+//     deposits: 3,
+//     withdrawals: 2
+//   },
+//   statusBreakdown: {
+//     success: 24,
+//     failed: 1,
+//     pending: 0
+//   },
+//   performanceMetrics: {
+//     avgGasUsed: "1250",
+//     avgGasPrice: "0.15",
+//     fastestExecution: "800ms",
+//     slowestExecution: "2100ms"
+//   }
+// }
+```
+
+### 🔍 Transaction History
+
+Access detailed transaction history with filtering options:
+
+```typescript
+// Get recent transactions
+const recentTxs = agent.metrics.getTransactions(10);
+
+// Filter by transaction type
+const swaps = agent.metrics.getTransactions(undefined, 'swap');
+const bridges = agent.metrics.getTransactions(undefined, 'bridge');
+
+// Get transactions from specific date range
+const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+const today = new Date();
+const todayTxs = agent.metrics.getTransactionsByDateRange(yesterday, today);
+```
+
+### 📊 Use Cases
+
+#### Dashboard Integration
+```typescript
+// Export metrics for external dashboard
+const dashboardData = agent.metrics.export();
+// Send to your monitoring service
+```
+
+#### Performance Monitoring
+```typescript
+// Monitor real-time performance
+const summary = agent.metrics.summary();
+if (parseFloat(summary.successRate) < 95) {
+  console.warn('Success rate below threshold:', summary.successRate);
+}
+```
+
+#### Debugging Failed Transactions
+```typescript
+// Get recent failed transactions for debugging
+const recentTxs = agent.metrics.getTransactions(20);
+const failedTxs = recentTxs.filter(tx => tx.status === 'failed');
+
+failedTxs.forEach(tx => {
+  console.log(`Failed ${tx.type} at ${new Date(tx.timestamp).toISOString()}: ${tx.errorMessage}`);
+});
+```
+
+#### Risk Analysis
+```typescript
+// Analyze risk patterns
+const summary = agent.metrics.summary();
+console.log(`Total volume: ${summary.totalVolume}`);
+console.log(`Average slippage: ${summary.avgSlippage}`);
+console.log(`Success rate: ${summary.successRate}`);
+
+// Check chain breakdown for bridges
+if (summary.chainBreakdown) {
+  Object.entries(summary.chainBreakdown).forEach(([chain, count]) => {
+    console.log(`${chain}: ${count} bridge transactions`);
+  });
+}
+```
+
+### 💾 Data Persistence
+
+Metrics are automatically persisted to `~/.stellartools/metrics-{network}.json` and survive application restarts. You can also export/import metrics for backup or analysis:
+
+```typescript
+// Export all metrics
+const allMetrics = agent.metrics.export();
+
+// Import metrics (useful for backup/restore)
+agent.metrics.import(allMetrics);
+
+// Clear all metrics
+agent.metrics.clear();
 ```
 
 ---

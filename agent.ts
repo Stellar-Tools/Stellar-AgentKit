@@ -15,6 +15,7 @@ import {
   type SwapBestRouteResult,
 } from "./lib/dex";
 import { bridgeTokenTool } from "./tools/bridge";
+import { MetricsCollector, type TransactionMetrics } from "./lib/metrics";
 import {
   Horizon,
   Keypair,
@@ -72,6 +73,7 @@ export class AgentClient {
   private network: NetworkType;
   private publicKey: string;
   private rpcUrl: string;
+  private metricsCollector: MetricsCollector;
 
   constructor(config: AgentConfig) {
     // Mainnet safety check for general operations
@@ -98,6 +100,7 @@ export class AgentClient {
     this.rpcUrl = config.rpcUrl || (config.network === "mainnet" 
       ? "https://horizon.stellar.org" 
       : "https://horizon-testnet.stellar.org");
+    this.metricsCollector = new MetricsCollector(config.network);
     
     if (!this.publicKey && this.network === "testnet") {
         // In a real SDK, we might not throw here if only read-only methods are used,
@@ -116,14 +119,49 @@ export class AgentClient {
     inMax: string;
     contractAddress?: string;
   }) {
-    return await contractSwap(
-      this.publicKey,
-      params.to,
-      params.buyA,
-      params.out,
-      params.inMax,
-      { network: this.network, rpcUrl: this.rpcUrl, contractAddress: params.contractAddress }
-    );
+    const startTime = Date.now();
+    const metricId = this.metricsCollector.recordTransaction({
+      type: 'swap',
+      status: 'pending',
+      amount: params.out,
+      toAddress: params.to,
+      fromAddress: this.publicKey,
+      contractAddress: params.contractAddress,
+    });
+
+    try {
+      const result = await contractSwap(
+        this.publicKey,
+        params.to,
+        params.buyA,
+        params.out,
+        params.inMax,
+        { network: this.network, rpcUrl: this.rpcUrl, contractAddress: params.contractAddress }
+      );
+
+      const executionTime = Date.now() - startTime;
+      
+      // Update transaction with success status and additional data
+      this.metricsCollector.updateTransactionStatus(metricId, 'success', {
+        executionTime,
+        transactionHash: typeof result === 'string' ? result : result?.hash || 'unknown',
+        status: 'success'
+      });
+
+      return result;
+    } catch (error) {
+      const executionTime = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Update transaction with failed status
+      this.metricsCollector.updateTransactionStatus(metricId, 'failed', {
+        executionTime,
+        errorMessage,
+        status: 'failed'
+      });
+
+      throw error;
+    }
   }
 
   /**
@@ -146,15 +184,52 @@ export class AgentClient {
     toAddress: string;
     targetChain?: "ethereum" | "polygon" | "arbitrum" | "base";
   }) {
-    return await bridgeTokenTool.func({
+    const startTime = Date.now();
+    const targetChain = params.targetChain ?? "ethereum";
+    const metricId = this.metricsCollector.recordTransaction({
+      type: 'bridge',
+      status: 'pending',
       amount: params.amount,
+      asset: 'USDC',
       toAddress: params.toAddress,
-      targetChain: params.targetChain ?? "ethereum",
-      fromNetwork:
-        this.network === "mainnet"
-          ? "stellar-mainnet"
-          : "stellar-testnet",
+      fromAddress: this.publicKey,
+      targetChain,
     });
+
+    try {
+      const result = await bridgeTokenTool.func({
+        amount: params.amount,
+        toAddress: params.toAddress,
+        targetChain,
+        fromNetwork:
+          this.network === "mainnet"
+            ? "stellar-mainnet"
+            : "stellar-testnet",
+      });
+
+      const executionTime = Date.now() - startTime;
+      
+      // Update transaction with success status and additional data
+      this.metricsCollector.updateTransactionStatus(metricId, 'success', {
+        executionTime,
+        transactionHash: result.hash,
+        status: result.status === 'confirmed' ? 'success' : 'pending'
+      });
+
+      return result;
+    } catch (error) {
+      const executionTime = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Update transaction with failed status
+      this.metricsCollector.updateTransactionStatus(metricId, 'failed', {
+        executionTime,
+        errorMessage,
+        status: 'failed'
+      });
+
+      throw error;
+    }
   }
 
   /**
@@ -169,15 +244,50 @@ export class AgentClient {
       minB: string;
       contractAddress?: string;
     }) => {
-      return await contractDeposit(
-        this.publicKey,
-        params.to,
-        params.desiredA,
-        params.minA,
-        params.desiredB,
-        params.minB,
-        { network: this.network, rpcUrl: this.rpcUrl, contractAddress: params.contractAddress }
-      );
+      const startTime = Date.now();
+      const totalAmount = (parseFloat(params.desiredA) + parseFloat(params.desiredB)).toString();
+      const metricId = this.metricsCollector.recordTransaction({
+        type: 'deposit',
+        status: 'pending',
+        amount: totalAmount,
+        toAddress: params.to,
+        fromAddress: this.publicKey,
+        contractAddress: params.contractAddress,
+      });
+
+      try {
+        const result = await contractDeposit(
+          this.publicKey,
+          params.to,
+          params.desiredA,
+          params.minA,
+          params.desiredB,
+          params.minB,
+          { network: this.network, rpcUrl: this.rpcUrl, contractAddress: params.contractAddress }
+        );
+
+        const executionTime = Date.now() - startTime;
+        
+        // Update transaction with success status and additional data
+        this.metricsCollector.updateTransactionStatus(metricId, 'success', {
+          executionTime,
+          status: 'success'
+        });
+
+        return result;
+      } catch (error) {
+        const executionTime = Date.now() - startTime;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        
+        // Update transaction with failed status
+        this.metricsCollector.updateTransactionStatus(metricId, 'failed', {
+          executionTime,
+          errorMessage,
+          status: 'failed'
+        });
+
+        throw error;
+      }
     },
 
     withdraw: async (params: {
@@ -187,14 +297,48 @@ export class AgentClient {
       minB: string;
       contractAddress?: string;
     }) => {
-      return await contractWithdraw(
-        this.publicKey,
-        params.to,
-        params.shareAmount,
-        params.minA,
-        params.minB,
-        { network: this.network, rpcUrl: this.rpcUrl, contractAddress: params.contractAddress }
-      );
+      const startTime = Date.now();
+      const metricId = this.metricsCollector.recordTransaction({
+        type: 'withdraw',
+        status: 'pending',
+        amount: params.shareAmount,
+        toAddress: params.to,
+        fromAddress: this.publicKey,
+        contractAddress: params.contractAddress,
+      });
+
+      try {
+        const result = await contractWithdraw(
+          this.publicKey,
+          params.to,
+          params.shareAmount,
+          params.minA,
+          params.minB,
+          { network: this.network, rpcUrl: this.rpcUrl, contractAddress: params.contractAddress }
+        );
+
+        const executionTime = Date.now() - startTime;
+        
+        // Update transaction with success status and additional data
+        this.metricsCollector.updateTransactionStatus(metricId, 'success', {
+          executionTime,
+          status: 'success'
+        });
+
+        return result;
+      } catch (error) {
+        const executionTime = Date.now() - startTime;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        
+        // Update transaction with failed status
+        this.metricsCollector.updateTransactionStatus(metricId, 'failed', {
+          executionTime,
+          errorMessage,
+          status: 'failed'
+        });
+
+        throw error;
+      }
     },
 
     getReserves: async (params?: { contractAddress?: string }) => {
@@ -203,6 +347,70 @@ export class AgentClient {
 
     getShareId: async (params?: { contractAddress?: string }) => {
       return await contractGetShareId(this.publicKey, { network: this.network, rpcUrl: this.rpcUrl, contractAddress: params?.contractAddress });
+    },
+  };
+
+  /**
+   * Metrics and analytics for transaction performance and insights.
+   */
+  public metrics = {
+    /**
+     * Get a comprehensive summary of all transaction metrics.
+     * 
+     * @example
+     * const summary = await agent.metrics.summary();
+     * console.log(summary);
+     * // {
+     * //   totalVolume: "10000",
+     * //   avgSlippage: "1.2%",
+     * //   successRate: "98%"
+     * // }
+     */
+    summary: () => {
+      return this.metricsCollector.calculateSummary();
+    },
+
+    /**
+     * Get recent transactions with optional filtering.
+     * 
+     * @param limit Maximum number of transactions to return
+     * @param type Filter by transaction type ('swap', 'bridge', 'deposit', 'withdraw')
+     */
+    getTransactions: (limit?: number, type?: TransactionMetrics['type']): TransactionMetrics[] => {
+      return this.metricsCollector.getTransactions(limit, type);
+    },
+
+    /**
+     * Get transactions within a specific date range.
+     * 
+     * @param startDate Start date for filtering
+     * @param endDate End date for filtering
+     */
+    getTransactionsByDateRange: (startDate: Date, endDate: Date): TransactionMetrics[] => {
+      return this.metricsCollector.getTransactionsByDateRange(startDate, endDate);
+    },
+
+    /**
+     * Export all metrics data for external analysis.
+     */
+    export: (): TransactionMetrics[] => {
+      return this.metricsCollector.exportMetrics();
+    },
+
+    /**
+     * Import metrics data from external source.
+     * 
+     * @param metrics Array of transaction metrics to import
+     */
+    import: (metrics: TransactionMetrics[]): void => {
+      this.metricsCollector.importMetrics(metrics);
+    },
+
+    /**
+     * Clear all stored metrics data.
+     */
+    clear: (): void => {
+      this.metricsCollector.clearMetrics();
     },
   };
 
