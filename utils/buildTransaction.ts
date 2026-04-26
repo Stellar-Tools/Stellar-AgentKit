@@ -125,10 +125,15 @@ export function buildTransactionFromXDR(
   // Reconstruct the transaction from XDR
   const transaction = TransactionBuilder.fromXDR(xdrTx, networkPassphrase);
   
+  // Ensure we have a Transaction, not FeeBumpTransaction
+  if (transaction instanceof Transaction === false) {
+    throw new Error("Expected Transaction but got FeeBumpTransaction");
+  }
+  
   // Note: Fee and timeout are already set in the XDR by external SDKs
   // We only apply memo if provided and not already in the transaction
-  if (config.memo && !(transaction as Transaction).memo) {
-    (transaction as Transaction).memo = Memo.text(config.memo);
+  if (config.memo && !transaction.memo) {
+    transaction.memo = Memo.text(config.memo);
   }
 
   return transaction;
@@ -150,7 +155,7 @@ export function buildPathPaymentTransaction(
     memo,
   });
 
-  if (operation.mode === "strict-send") {
+  if (operation.mode as "strict-send" | "strict-receive" === "strict-send") {
     if (!operation.destMin) {
       throw new Error("destMin is required for strict-send path payments");
     }

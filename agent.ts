@@ -300,7 +300,7 @@ export class AgentClient {
 
       // Connect to Stellar network
       const server = new Horizon.Server(this.rpcUrl);
-      const networkPassphrase: string = (this.network as NetworkType) === "mainnet" ? Networks.PUBLIC : Networks.TESTNET;
+      const networkPassphrase: string = this.network as NetworkType === "mainnet" ? Networks.PUBLIC : Networks.TESTNET;
 
       // Step 1: Load or create issuer account
       let issuerAccount;
@@ -412,7 +412,7 @@ export class AgentClient {
    * @returns true if trustline exists, false otherwise
    */
   private async checkTrustlineExists(
-    server: typeof Horizon.Server,
+    server: Horizon.Server,
     accountPublicKey: string, 
     asset: Asset
   ): Promise<boolean> {
@@ -425,16 +425,26 @@ export class AgentClient {
         // Type guard to ensure balance has asset_code and asset_issuer properties
         if (!('asset_code' in balance) || !('asset_issuer' in balance)) return false;
         
+        // Now we know balance has asset_code and asset_issuer properties
+        const typedBalance = balance as Extract<Horizon.HorizonApi.BalanceLine, { 
+          asset_type: string; 
+          asset_code: string; 
+          asset_issuer: string; 
+        }>;
+        
         return (
-          balance.asset_code === asset.code &&
-          balance.asset_issuer === asset.issuer
+          typedBalance.asset_code === asset.code &&
+          typedBalance.asset_issuer === asset.issuer
         );
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       // If the account does not exist, there can be no trustline.
-      const status = error?.response?.status;
-      if (status === 404) {
-        return false;
+      if (error && typeof error === 'object' && 'response' in error) {
+        const errorWithResponse = error as { response?: { status?: number } };
+        const status = errorWithResponse.response?.status;
+        if (status === 404) {
+          return false;
+        }
       }
 
       console.error(`Error checking trustline: ${error instanceof Error ? error.message : String(error)}`);
@@ -452,7 +462,7 @@ export class AgentClient {
    * @returns Transaction hash of the trustline creation
    */
   private async createTrustline(
-    server: typeof Horizon.Server,
+    server: Horizon.Server,
     accountKeypair: Keypair,
     asset: Asset,
     networkPassphrase: string
@@ -502,7 +512,7 @@ export class AgentClient {
    * @returns Transaction hash of the locking operation
    */
   private async lockIssuerAccount(
-    server: typeof Horizon.Server,
+    server: Horizon.Server,
     issuerKeypair: Keypair,
     networkPassphrase: string
   ): Promise<{ hash: string }> {

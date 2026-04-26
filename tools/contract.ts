@@ -93,9 +93,10 @@ export const StellarLiquidityContractTool = new DynamicStructuredTool({
         default:
           throw new Error("Unsupported action");
       }
-    } catch (error: any) {
-      console.error("StellarLiquidityContractTool error:", error.message);
-      throw new Error(`Failed to execute ${action}: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("StellarLiquidityContractTool error:", errorMessage);
+      throw new Error(`Failed to execute ${action}: ${errorMessage}`);
     }
   },
 });
