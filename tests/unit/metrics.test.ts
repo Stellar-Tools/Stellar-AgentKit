@@ -21,11 +21,23 @@ describe('MetricsCollector', () => {
       writeFileSync(testDataDir, ''); // Create directory marker
     }
     
-    // Create a mock MetricsCollector that uses the test directory
-    metricsCollector = new MetricsCollector(testNetwork as any);
+    // Create MetricsCollector with dependency injection to avoid touching real user file
+    // Temporarily override the homedir to use test directory during instantiation
+    const originalHomedir = homedir();
+    const mockHomedir = () => testDataDir;
     
-    // Override the metrics file path to use test directory BEFORE any operations
-    (metricsCollector as any).metricsFile = testMetricsFile;
+    // Temporarily replace the homedir function for this test
+    const homedirModule = require('os');
+    const originalHomedirFn = homedirModule.homedir;
+    homedirModule.homedir = mockHomedir;
+    
+    try {
+      // Now MetricsCollector will use the test directory from the start
+      metricsCollector = new MetricsCollector(testNetwork as any);
+    } finally {
+      // Restore the original homedir function
+      homedirModule.homedir = originalHomedirFn;
+    }
     
     // Clear any existing metrics to ensure clean test state
     metricsCollector.clearMetrics();
