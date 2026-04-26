@@ -63,7 +63,7 @@ export function buildTransaction(
   sourceAccount: Account,
   sorobanOperation: SorobanOperationParams,
   config: BuildTransactionConfig = {}
-): any {
+): Transaction {
   // Normalize configuration with sensible defaults per operation type
   const fee = config.fee || BASE_FEE;
   const timeout = config.timeout !== undefined ? config.timeout : getDefaultTimeout(operationType);
@@ -121,13 +121,13 @@ export function buildTransactionFromXDR(
   xdrTx: string,
   networkPassphrase: string,
   config: BuildTransactionConfig = {}
-): any {
+): Transaction {
   // Reconstruct the transaction from XDR
   const transaction = TransactionBuilder.fromXDR(xdrTx, networkPassphrase);
   
   // Note: Fee and timeout are already set in the XDR by external SDKs
   // We only apply memo if provided and not already in the transaction
-  if (config.memo) {
+  if (config.memo && !(transaction as Transaction).memo) {
     (transaction as Transaction).memo = Memo.text(config.memo);
   }
 
@@ -208,8 +208,9 @@ function getDefaultTimeout(operationType: OperationType): number {
     case "stake":
       return 300;
     default:
-      const _exhaustive: never = operationType;
-      return _exhaustive;
+      // Type guard to ensure exhaustive matching
+      const _exhaustiveCheck: never = operationType;
+      throw new Error(`Unhandled operation type: ${_exhaustiveCheck}`);
   }
 }
 

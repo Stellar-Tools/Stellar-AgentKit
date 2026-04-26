@@ -25,10 +25,10 @@ import {
   BASE_FEE
 } from "@stellar/stellar-sdk";
 
-const { Server } = Horizon;
+export type NetworkType = "testnet" | "mainnet";
 
 export interface AgentConfig {
-  network: "testnet" | "mainnet";
+  network: NetworkType;
   rpcUrl?: string;
   publicKey?: string;
   allowMainnet?: boolean; // Optional mainnet opt-in flag for general operations
@@ -69,7 +69,7 @@ export type {
 };
 
 export class AgentClient {
-  private network: "testnet" | "mainnet";
+  private network: NetworkType;
   private publicKey: string;
   private rpcUrl: string;
 
@@ -300,7 +300,7 @@ export class AgentClient {
 
       // Connect to Stellar network
       const server = new Horizon.Server(this.rpcUrl);
-      const networkPassphrase = Networks.TESTNET;
+      const networkPassphrase: string = (this.network as NetworkType) === "mainnet" ? Networks.PUBLIC : Networks.TESTNET;
 
       // Step 1: Load or create issuer account
       let issuerAccount;
@@ -412,15 +412,18 @@ export class AgentClient {
    * @returns true if trustline exists, false otherwise
    */
   private async checkTrustlineExists(
-    server: Horizon.Server,
+    server: typeof Horizon.Server,
     accountPublicKey: string, 
     asset: Asset
   ): Promise<boolean> {
     try {
       const account = await server.loadAccount(accountPublicKey);
       
-      return account.balances.some((balance: Horizon.HorizonApi.BalanceLine) => {
+      return account.balances.some((balance: Horizon.HorizonApi.BalanceLine): boolean => {
         if (balance.asset_type === 'native' || balance.asset_type === 'liquidity_pool_shares') return false;
+        
+        // Type guard to ensure balance has asset_code and asset_issuer properties
+        if (!('asset_code' in balance) || !('asset_issuer' in balance)) return false;
         
         return (
           balance.asset_code === asset.code &&
@@ -449,7 +452,7 @@ export class AgentClient {
    * @returns Transaction hash of the trustline creation
    */
   private async createTrustline(
-    server: Horizon.Server,
+    server: typeof Horizon.Server,
     accountKeypair: Keypair,
     asset: Asset,
     networkPassphrase: string
@@ -499,7 +502,7 @@ export class AgentClient {
    * @returns Transaction hash of the locking operation
    */
   private async lockIssuerAccount(
-    server: Horizon.Server,
+    server: typeof Horizon.Server,
     issuerKeypair: Keypair,
     networkPassphrase: string
   ): Promise<{ hash: string }> {
