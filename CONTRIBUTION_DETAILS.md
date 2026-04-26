@@ -1,44 +1,59 @@
 # Contribution Details
 
 ## Overview
-This contribution implements an intelligent route optimizer for Stellar AgentKit that addresses inefficient trades by providing optimal pricing across multiple DEXes and liquidity pools.
+This contribution implements pre-execution simulation functionality for Stellar AgentKit that allows users to safely test transactions without spending real funds, addressing the critical safety issue of blind transaction execution.
 
 ## Key Features
-- **Multi-DEX Routing** - Queries Horizon and Soroban AMM pools for best rates
-- **Strategy-Based Optimization** - 4 strategies: best-route, direct, minimal-hops, split
-- **Multi-Hop Discovery** - Finds optimal paths through intermediate assets
-- **Real-time Data** - 30-second cached pool data with automatic refresh
-- **Price Impact Analysis** - Estimates slippage and market impact
+- **Pre-execution Simulation** - Test transactions without spending real funds
+- **Multi-operation Support** - Simulate swap, bridge, and LP operations
+- **Fee Estimation** - Accurate cost predictions for different chains
+- **Error Detection** - Catch issues before costly execution
+- **Graceful Degradation** - Works even with missing environment variables
 
 ## Technical Implementation
 **New Files:**
-- `lib/routeOptimizer.ts` - Core routing engine (500+ lines)
-- `tests/unit/routeOptimizer.test.ts` - Comprehensive test suite
-- `examples/route-optimizer-example.ts` - Usage examples
-- `docs/route-optimizer.md` - Complete documentation
+- `examples/simulation-examples.ts` - Comprehensive usage examples
+- `tests/unit/simulation.test.ts` - Complete test suite for simulation features
 
 **Modified Files:**
-- `agent.ts` - Added `swapOptimized()` method (+50 lines)
+- `agent.ts` - Added `simulate` namespace with swap, bridge, LP methods (+200 lines)
+- `README.md` - Added complete simulation documentation and examples
+- `utils/buildTransaction.ts` - Fixed memo detection logic
+- `lib/metrics.ts` - Added validation and NaN filtering
 - `README.md` - Added routing documentation (+50 lines)
 
 ## Usage
 ```typescript
-await agent.swapOptimized({
-  strategy: "best-route",
-  sendAsset: { type: "native" },
-  destAsset: { code: "USDC", issuer: "GB..." },
-  sendAmount: "100"
+// Simulate before execution
+const swapSim = await agent.simulate.swap({
+  to: "GD5DJQD5YFHR6CHCK7L4EZK3I2E5DSYXW4AFK5WGPDXN5RBTCEQYV5A4",
+  buyA: true,
+  out: "100",
+  inMax: "105"
 });
+
+if (swapSim.success) {
+  // Execute with confidence
+  await agent.swap({
+    to: "GD5DJQD5YFHR6CHCK7L4EZK3I2E5DSYXW4AFK5WGPDXN5RBTCEQYV5A4",
+    buyA: true,
+    out: "100",
+    inMax: "105"
+  });
+}
 ```
 
 ## Impact
-- **Better Pricing** - Always get optimal rates across all pools
-- **Reduced Slippage** - Intelligent routing minimizes market impact
-- **Developer Experience** - Drop-in replacement with rich analytics
-- **Ecosystem Enhancement** - Transforms AgentKit into sophisticated routing platform
+- **Enhanced Safety** - Prevents costly execution errors through simulation
+- **Cost Transparency** - Users see fees and timing before execution
+- **Developer Confidence** - Test parameters without risking real funds
+- **Ecosystem Safety** - Reduces risk of failed transactions on Stellar network
 
 ## Critical Fixes
-- Fixed LP deposit precision issues (parseFloat → Number())
+- Fixed environment variable leakage in tests
+- Added division by zero protection in calculations
+- Improved memo detection logic
+- Added metrics validation and NaN filtering
 - Added FeeBumpTransaction support in buildTransaction
 - Replaced synchronous persistence with debounced async saves
 - Moved bridge environment validation to runtime

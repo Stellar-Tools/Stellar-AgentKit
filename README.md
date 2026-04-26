@@ -328,8 +328,8 @@ await agent.bridge({ ... });
 
 **Supported Routes:**
 
-- Stellar Testnet → Ethereum (Testnet)
-- Stellar Mainnet → Ethereum (Mainnet) *requires both `allowMainnet: true` and `ALLOW_MAINNET_BRIDGE=true`*
+- Stellar Testnet → Ethereum, Polygon, Arbitrum, Base (Testnet)
+- Stellar Mainnet → Ethereum, Polygon, Arbitrum, Base (Mainnet) *requires both `allowMainnet: true` and `ALLOW_MAINNET_BRIDGE=true`*
 
 ---
 

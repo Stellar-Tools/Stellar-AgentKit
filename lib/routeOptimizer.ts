@@ -744,6 +744,12 @@ export class RouteOptimizer {
     const feeMultiplier = new Big(1).minus(pool.fee);
     const numerator = output.mul(reserveInBig);
     const denominator = reserveOutBig.minus(output).mul(feeMultiplier);
+    
+    // Check for division by zero
+    if (denominator.eq(0)) {
+      throw new Error("Invalid pool state: denominator cannot be zero");
+    }
+    
     const input = numerator.div(denominator);
     
     return input.toFixed(7);

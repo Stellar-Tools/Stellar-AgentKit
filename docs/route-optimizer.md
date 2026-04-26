@@ -162,7 +162,7 @@ const route = await optimizer.findOptimalRoute({
 // Execute the swap
 const result = await optimizer.executeOptimizedSwap(
   { strategy: 'best-route', sendAsset, destAsset, sendAmount },
-  destination,
+  destinationAddress,
   signerPublicKey
 );
 ```

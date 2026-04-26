@@ -15,7 +15,7 @@ async function demonstrateRouteOptimizer() {
     // Initialize AgentClient for testnet
     const agent = new AgentClient({
       network: "testnet",
-      publicKey: process.env.STELLAR_PUBLIC_KEY || 'GB...TEST',
+      publicKey: process.env.STELLAR_PUBLIC_KEY || 'GD5DJQD5YFHR6CHCK7L4EZK3I2E5DSYXW4AFK5WGPDXN5RBTCEQYV5A4',
       allowMainnet: false,
     });
 
