@@ -414,7 +414,7 @@ export class RouteOptimizer {
     const estimatedGas = (route.hopCount * 100000).toString(); // Rough estimate
     
     // Calculate confidence based on pool liquidity and route complexity
-    const confidence = this.calculateConfidence(route);
+    const confidence = this.calculateConfidence({ ...route, priceImpact });
 
     return {
       ...route,
