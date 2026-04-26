@@ -156,6 +156,7 @@ export function buildTransactionFromXDR(
 function hasMemo(transaction: Transaction): boolean {
   return transaction.memo !== undefined && 
          transaction.memo.value !== undefined &&
+         transaction.memo.value !== null &&
          transaction.memo.value !== "";
 }
 
