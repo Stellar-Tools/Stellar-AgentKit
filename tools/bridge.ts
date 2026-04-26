@@ -107,6 +107,17 @@ export const bridgeTokenTool = new DynamicStructuredTool({
     targetChain: TargetChain;
   }) => {
     // Validate environment variables at runtime
+    // Mainnet safeguard - additional layer beyond AgentClient
+    if (
+      fromNetwork === "stellar-mainnet" &&
+      process.env.ALLOW_MAINNET_BRIDGE !== "true"
+    ) {
+      throw new Error(
+        "Mainnet bridging is disabled. Set ALLOW_MAINNET_BRIDGE=true in your .env file to enable."
+      );
+    }
+
+    // Validate environment variables at runtime
     const { fromAddress, privateKey, srbProviderUrl } = validateBridgeEnv();
 
     const destinationChainSymbol = TARGET_CHAIN_MAP[targetChain];
