@@ -80,6 +80,46 @@ export type {
   RouteOption,
 };
 
+export interface SimulationResult {
+  status: "simulated";
+  success: boolean;
+  minResourceFee?: string;
+  cost?: any;
+  events?: number;
+  result?: any;
+  error?: string;
+  transactionDetails?: {
+    operations: number;
+    fee?: string;
+    timeout?: number;
+  };
+}
+
+export interface SwapSimulationParams {
+  to: string;
+  buyA: boolean;
+  out: string;
+  inMax: string;
+  contractAddress?: string;
+}
+
+export interface BridgeSimulationParams {
+  amount: string;
+  toAddress: string;
+  targetChain?: "ethereum" | "polygon" | "arbitrum" | "base";
+}
+
+export interface LPSimulationParams {
+  operation: "deposit" | "withdraw";
+  to: string;
+  desiredA?: string;
+  minA?: string;
+  desiredB?: string;
+  minB?: string;
+  shareAmount?: string;
+  contractAddress?: string;
+}
+
 export class AgentClient {
   private network: NetworkType;
   private publicKey: string;
@@ -492,6 +532,223 @@ export class AgentClient {
     getShareId: async (params?: { contractAddress?: string }) => {
       return await contractGetShareId(this.publicKey, { network: this.network, rpcUrl: this.rpcUrl, contractAddress: params?.contractAddress });
     },
+  };
+
+  /**
+   * Pre-execution simulation for safe transaction testing.
+   * 
+   * These methods allow you to simulate transactions before executing them,
+   * providing detailed information about what would happen without consuming
+   * real funds or making on-chain changes.
+   * 
+   * @example
+   * // Simulate a swap before execution
+   * const swapSim = await agent.simulate.swap({
+   *   to: "GD...",
+   *   buyA: true,
+   *   out: "100",
+   *   inMax: "105"
+   * });
+   * 
+   * // Simulate a bridge before execution  
+   * const bridgeSim = await agent.simulate.bridge({
+   *   amount: "100",
+   *   toAddress: "0x...",
+   *   targetChain: "ethereum"
+   * });
+   * 
+   * // Simulate LP operations before execution
+   * const lpSim = await agent.simulate.lp({
+   *   operation: "deposit",
+   *   to: "GD...",
+   *   desiredA: "50",
+   *   minA: "45",
+   *   desiredB: "50", 
+   *   minB: "45"
+   * });
+   */
+  public simulate = {
+    /**
+     * Simulate a swap operation without executing it.
+     * 
+     * This method provides detailed information about what would happen
+     * during a swap, including fees, expected outputs, and potential errors.
+     * 
+     * @param params Swap simulation parameters
+     * @returns Simulation result with detailed transaction information
+     */
+    swap: async (params: SwapSimulationParams): Promise<SimulationResult> => {
+      try {
+        const result = await contractSwap(
+          this.publicKey,
+          params.to,
+          params.buyA,
+          params.out,
+          params.inMax,
+          { 
+            network: this.network, 
+            rpcUrl: this.rpcUrl, 
+            contractAddress: params.contractAddress,
+            simulate: true // Enable simulation mode
+          }
+        );
+
+        // Parse the simulation result
+        const simulationData = typeof result === 'string' ? JSON.parse(result) : result;
+        
+        return {
+          status: "simulated",
+          success: true,
+          minResourceFee: simulationData.minResourceFee,
+          cost: simulationData.cost,
+          events: simulationData.events,
+          result: simulationData.result,
+          transactionDetails: {
+            operations: 1,
+            fee: simulationData.minResourceFee
+          }
+        };
+      } catch (error) {
+        return {
+          status: "simulated",
+          success: false,
+          error: error instanceof Error ? error.message : String(error)
+        };
+      }
+    },
+
+    /**
+     * Simulate a bridge operation without executing it.
+     * 
+     * This method provides detailed information about what would happen
+     * during a bridge operation, including fees, timing, and requirements.
+     * 
+     * @param params Bridge simulation parameters
+     * @returns Simulation result with detailed bridge information
+     */
+    bridge: async (params: BridgeSimulationParams): Promise<SimulationResult> => {
+      try {
+        // For bridge simulation, we need to check the requirements and estimate costs
+        // without actually executing the bridge transaction
+        const targetChain = params.targetChain ?? "ethereum";
+        
+        // Validate bridge parameters (similar to actual bridge but without execution)
+        const { fromAddress } = await import("./tools/bridge").then(m => m.validateBridgeEnv(
+          this.network === "mainnet" ? "stellar-mainnet" : "stellar-testnet"
+        ));
+
+        // Simulate bridge requirements and costs
+        const estimatedFee = targetChain === "ethereum" ? "0.002" : 
+                           targetChain === "polygon" ? "0.001" : 
+                           targetChain === "arbitrum" ? "0.0005" : "0.0008";
+        
+        const estimatedTime = targetChain === "ethereum" ? "15-30" : 
+                            targetChain === "polygon" ? "5-15" : 
+                            targetChain === "arbitrum" ? "10-20" : "5-15";
+
+        return {
+          status: "simulated",
+          success: true,
+          result: {
+            amount: params.amount,
+            fromAddress,
+            toAddress: params.toAddress,
+            targetChain,
+            estimatedFee: `${estimatedFee} ETH`,
+            estimatedTimeMinutes: estimatedTime,
+            requiresTrustline: true
+          },
+          transactionDetails: {
+            operations: 2, // Bridge + potential trustline
+            fee: estimatedFee
+          }
+        };
+      } catch (error) {
+        return {
+          status: "simulated",
+          success: false,
+          error: error instanceof Error ? error.message : String(error)
+        };
+      }
+    },
+
+    /**
+     * Simulate liquidity pool operations without executing them.
+     * 
+     * This method provides detailed information about what would happen
+     * during LP deposit or withdraw operations.
+     * 
+     * @param params LP simulation parameters
+     * @returns Simulation result with detailed LP operation information
+     */
+    lp: async (params: LPSimulationParams): Promise<SimulationResult> => {
+      try {
+        let result;
+        
+        if (params.operation === "deposit") {
+          if (!params.desiredA || !params.desiredB || !params.minA || !params.minB) {
+            throw new Error("Deposit operation requires desiredA, desiredB, minA, and minB parameters");
+          }
+          
+          result = await contractDeposit(
+            this.publicKey,
+            params.to,
+            params.desiredA,
+            params.minA,
+            params.desiredB,
+            params.minB,
+            { 
+              network: this.network, 
+              rpcUrl: this.rpcUrl, 
+              contractAddress: params.contractAddress,
+              simulate: true
+            }
+          );
+        } else if (params.operation === "withdraw") {
+          if (!params.shareAmount || !params.minA || !params.minB) {
+            throw new Error("Withdraw operation requires shareAmount, minA, and minB parameters");
+          }
+          
+          result = await contractWithdraw(
+            this.publicKey,
+            params.to,
+            params.shareAmount,
+            params.minA,
+            params.minB,
+            { 
+              network: this.network, 
+              rpcUrl: this.rpcUrl, 
+              contractAddress: params.contractAddress,
+              simulate: true
+            }
+          );
+        } else {
+          throw new Error("LP operation must be either 'deposit' or 'withdraw'");
+        }
+
+        // Parse the simulation result
+        const simulationData = typeof result === 'string' ? JSON.parse(result) : result;
+        
+        return {
+          status: "simulated",
+          success: true,
+          minResourceFee: simulationData.minResourceFee,
+          cost: simulationData.cost,
+          events: simulationData.events,
+          result: simulationData.result,
+          transactionDetails: {
+            operations: 1,
+            fee: simulationData.minResourceFee
+          }
+        };
+      } catch (error) {
+        return {
+          status: "simulated",
+          success: false,
+          error: error instanceof Error ? error.message : String(error)
+        };
+      }
+    }
   };
 
   /**

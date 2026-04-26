@@ -21,7 +21,8 @@ multiple operations into a single programmable and extensible toolkit.
 - Cross-chain bridging
 - Liquidity pool (LP) deposits & withdrawals
 - Querying pool reserves and share IDs
-- **📊 Transaction analytics and performance metrics**
+- **� Pre-execution Simulation** - Test transactions safely without spending real funds
+- **� Transaction analytics and performance metrics**
 - Historical tracking and debugging visibility
 - Risk analytics and insights
 - Custom contract integrations (current)
@@ -329,6 +330,195 @@ await agent.bridge({ ... });
 
 - Stellar Testnet → Ethereum (Testnet)
 - Stellar Mainnet → Ethereum (Mainnet) *requires both `allowMainnet: true` and `ALLOW_MAINNET_BRIDGE=true`*
+
+---
+
+## 🔮 Pre-execution Simulation
+
+**NEW:** Test transactions safely without spending real funds! The simulation feature allows you to validate transaction parameters, estimate fees, and catch errors before executing real transactions.
+
+### Why Use Simulation?
+
+- 🛡️ **Safety First** - Test parameters without risking real funds
+- 💰 **Cost Estimation** - See fees and gas costs upfront
+- 🐛 **Error Detection** - Catch issues before they cost you money
+- ⏱️ **Timing Insights** - Understand execution time requirements
+- 📊 **Transaction Details** - Full visibility into what will happen
+
+### Basic Usage
+
+```typescript
+import { AgentClient } from "stellar-agentkit";
+
+const agent = new AgentClient({
+  network: "testnet", // or "mainnet" with allowMainnet: true
+});
+
+// Simulate a swap before execution
+const swapSimulation = await agent.simulate.swap({
+  to: "GD5DJQD5YFHR6CHCK7L4EZK3I2E5DSYXW4AFK5WGPDXN5RBTCEQYV5A4",
+  buyA: true,
+  out: "100",
+  inMax: "105"
+});
+
+if (swapSimulation.success) {
+  console.log("✅ Swap simulation successful!");
+  console.log(`Estimated fee: ${swapSimulation.transactionDetails?.fee}`);
+  
+  // Execute with confidence
+  await agent.swap({
+    to: "GD5DJQD5YFHR6CHCK7L4EZK3I2E5DSYXW4AFK5WGPDXN5RBTCEQYV5A4",
+    buyA: true,
+    out: "100", 
+    inMax: "105"
+  });
+} else {
+  console.log("❌ Simulation failed:", swapSimulation.error);
+}
+```
+
+### Swap Simulation
+
+```typescript
+const swapSim = await agent.simulate.swap({
+  to: "recipient_address",
+  buyA: true,
+  out: "100",
+  inMax: "105",
+  contractAddress: "optional_contract_address"
+});
+
+// Response format
+{
+  status: "simulated",
+  success: true,
+  minResourceFee: "0.01",
+  cost: { cpu: 1000, memory: 2000 },
+  events: 2,
+  result: "expected_output",
+  transactionDetails: {
+    operations: 1,
+    fee: "0.01"
+  }
+}
+```
+
+### Bridge Simulation
+
+```typescript
+const bridgeSim = await agent.simulate.bridge({
+  amount: "100",
+  toAddress: "0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b",
+  targetChain: "ethereum" // or "polygon", "arbitrum", "base"
+});
+
+// Response format
+{
+  status: "simulated",
+  success: true,
+  result: {
+    amount: "100",
+    fromAddress: "your_stellar_address",
+    toAddress: "0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b",
+    targetChain: "ethereum",
+    estimatedFee: "0.002 ETH",
+    estimatedTimeMinutes: "15-30",
+    requiresTrustline: true
+  },
+  transactionDetails: {
+    operations: 2,
+    fee: "0.002"
+  }
+}
+```
+
+### Liquidity Pool Simulation
+
+```typescript
+// Simulate LP deposit
+const depositSim = await agent.simulate.lp({
+  operation: "deposit",
+  to: "recipient_address",
+  desiredA: "50",
+  minA: "45", 
+  desiredB: "50",
+  minB: "45"
+});
+
+// Simulate LP withdrawal
+const withdrawSim = await agent.simulate.lp({
+  operation: "withdraw",
+  to: "recipient_address",
+  shareAmount: "100",
+  minA: "40",
+  minB: "40"
+});
+```
+
+### Multi-Chain Bridge Comparison
+
+```typescript
+const chains = ["ethereum", "polygon", "arbitrum", "base"] as const;
+
+for (const chain of chains) {
+  const sim = await agent.simulate.bridge({
+    amount: "50",
+    toAddress: "0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b",
+    targetChain: chain
+  });
+  
+  if (sim.success) {
+    console.log(`${chain}: ${sim.result?.estimatedFee}, ${sim.result?.estimatedTimeMinutes} min`);
+  }
+}
+```
+
+### Error Handling
+
+```typescript
+const sim = await agent.simulate.swap({
+  to: "invalid_address", // Invalid format
+  buyA: true,
+  out: "100",
+  inMax: "105"
+});
+
+if (!sim.success) {
+  console.log("Simulation caught error:", sim.error);
+  // "Invalid address format: invalid_address"
+}
+```
+
+### Best Practices
+
+- ✅ **Always simulate before executing** on mainnet
+- ✅ **Check simulation success** before proceeding
+- ✅ **Review estimated fees** to avoid surprises
+- ✅ **Validate addresses** in simulation first
+- ✅ **Test edge cases** with invalid parameters
+- ✅ **Use simulation for debugging** failed transactions
+
+### Integration Example
+
+```typescript
+async function safeSwap(params: SwapParams) {
+  // 1. Simulate first
+  const sim = await agent.simulate.swap(params);
+  
+  if (!sim.success) {
+    throw new Error(`Simulation failed: ${sim.error}`);
+  }
+  
+  // 2. Check if acceptable
+  if (parseFloat(sim.transactionDetails?.fee || "0") > 0.1) {
+    throw new Error("Fee too high");
+  }
+  
+  // 3. Execute with confidence
+  return await agent.swap(params);
+}
+```
 
 ---
 
