@@ -118,13 +118,10 @@ test("should handle swap simulation errors gracefully", async () => {
 
 test("should simulate bridge operation successfully", async () => {
   // Mock environment variables for bridge validation
-  const originalEnv = process.env;
-  process.env = {
-    ...originalEnv,
-    STELLAR_PUBLIC_KEY: testConfig.publicKey,
-    STELLAR_PRIVATE_KEY: Keypair.random().secret(),
-    SRB_PROVIDER_URL: "https://soroban-testnet.stellar.org"
-  };
+  const originalEnv = { ...process.env };
+  process.env.STELLAR_PUBLIC_KEY = testConfig.publicKey;
+  process.env.STELLAR_PRIVATE_KEY = Keypair.random().secret();
+  process.env.SRB_PROVIDER_URL = "https://soroban-testnet.stellar.org";
 
   try {
     const result = await agent.simulate.bridge({
@@ -141,18 +138,16 @@ test("should simulate bridge operation successfully", async () => {
     expect(result.result).toHaveProperty("estimatedFee");
     expect(result.result).toHaveProperty("estimatedTimeMinutes");
   } finally {
+    // Restore original environment
     process.env = originalEnv;
   }
 });
 
 test("should simulate bridge to different chains", async () => {
-  const originalEnv = process.env;
-  process.env = {
-    ...originalEnv,
-    STELLAR_PUBLIC_KEY: testConfig.publicKey,
-    STELLAR_PRIVATE_KEY: Keypair.random().secret(),
-    SRB_PROVIDER_URL: "https://soroban-testnet.stellar.org"
-  };
+  const originalEnv = { ...process.env };
+  process.env.STELLAR_PUBLIC_KEY = testConfig.publicKey;
+  process.env.STELLAR_PRIVATE_KEY = Keypair.random().secret();
+  process.env.SRB_PROVIDER_URL = "https://soroban-testnet.stellar.org";
 
   try {
     const chains = ["polygon", "arbitrum", "base"] as const;
@@ -176,7 +171,7 @@ test("should simulate bridge to different chains", async () => {
 
 test("should handle bridge simulation with missing environment", async () => {
   // Clear environment variables
-  const originalEnv = process.env;
+  const originalEnv = { ...process.env };
   delete process.env.STELLAR_PUBLIC_KEY;
   delete process.env.STELLAR_PRIVATE_KEY;
   delete process.env.SRB_PROVIDER_URL;
@@ -189,8 +184,10 @@ test("should handle bridge simulation with missing environment", async () => {
 
     expect(result).toBeDefined();
     expect(result.status).toBe("simulated");
-    expect(result.success).toBe(false);
-    expect(result).toHaveProperty("error");
+    // Bridge simulation should now succeed even without env vars (graceful degradation)
+    expect(result.success).toBe(true);
+    expect(result.result).toHaveProperty("estimatedFee");
+    expect(result.result).toHaveProperty("estimatedTimeMinutes");
   } finally {
     process.env = originalEnv;
   }
@@ -368,93 +365,5 @@ test("should handle network errors gracefully", async () => {
 
 // ─── Results Summary ─────────────────────────────────────────────────────────
 
-async function runAllTests() {
-  console.log("🧪 Running Simulation Tests...\n");
-
-  // Run all tests
-  await test("should simulate swap operation successfully", async () => {
-    const result = await agent.simulate.swap({
-      to: Keypair.random().publicKey(),
-      buyA: true,
-      out: "100",
-      inMax: "105"
-    });
-    expect(result).toBeDefined();
-    expect(result.status).toBe("simulated");
-  });
-
-  await test("should handle swap simulation with contract address", async () => {
-    const result = await agent.simulate.swap({
-      to: Keypair.random().publicKey(),
-      buyA: false,
-      out: "50",
-      inMax: "55",
-      contractAddress: "CCUMBJFVC3YJOW3OOR6WTWTESH473ZSXQEGYPQDWXAYYC4J77OT4NVHJ"
-    });
-    expect(result).toBeDefined();
-    expect(result.status).toBe("simulated");
-  });
-
-  await test("should simulate LP deposit operation successfully", async () => {
-    const result = await agent.simulate.lp({
-      operation: "deposit",
-      to: Keypair.random().publicKey(),
-      desiredA: "50",
-      minA: "45",
-      desiredB: "50",
-      minB: "45"
-    });
-    expect(result).toBeDefined();
-    expect(result.status).toBe("simulated");
-  });
-
-  await test("should simulate LP withdraw operation successfully", async () => {
-    const result = await agent.simulate.lp({
-      operation: "withdraw",
-      to: Keypair.random().publicKey(),
-      shareAmount: "100",
-      minA: "40",
-      minB: "40"
-    });
-    expect(result).toBeDefined();
-    expect(result.status).toBe("simulated");
-  });
-
-  await test("should handle LP deposit with missing parameters", async () => {
-    const result = await agent.simulate.lp({
-      operation: "deposit",
-      to: Keypair.random().publicKey(),
-    });
-    expect(result).toBeDefined();
-    expect(result.status).toBe("simulated");
-    expect(result.success).toBe(false);
-  });
-
-  await test("should maintain consistent simulation result structure", async () => {
-    const swapResult = await agent.simulate.swap({
-      to: Keypair.random().publicKey(),
-      buyA: true,
-      out: "10",
-      inMax: "11"
-    });
-    expect(swapResult).toHaveProperty("status");
-    expect(swapResult).toHaveProperty("success");
-    expect(swapResult.status).toBe("simulated");
-  });
-
-  console.log(`\n📊 Test Results: ${passed + failed} tests — ${passed} passed, ${failed} failed`);
-  
-  if (failed > 0) {
-    console.log("\n❌ Some tests failed!");
-    process.exit(1);
-  } else {
-    console.log("\n✅ All tests passed!");
-  }
-}
-
-// Run tests if this file is executed directly
-if (require.main === module) {
-  runAllTests().catch(console.error);
-}
-
-export { runAllTests };
+console.log(`\n${passed + failed} tests — ${passed} passed, ${failed} failed`);
+if (failed > 0) process.exit(1);

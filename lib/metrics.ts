@@ -66,7 +66,14 @@ export class MetricsCollector {
     try {
       if (existsSync(this.metricsFile)) {
         const data = readFileSync(this.metricsFile, 'utf8');
-        this.metrics = JSON.parse(data);
+        const parsed = JSON.parse(data);
+        // Validate that parsed data is an array
+        if (Array.isArray(parsed)) {
+          this.metrics = parsed;
+        } else {
+          console.warn('Invalid metrics data format, expected array, got:', typeof parsed);
+          this.metrics = [];
+        }
       }
     } catch (error) {
       console.error('Failed to load metrics:', error);
@@ -237,8 +244,8 @@ export class MetricsCollector {
     });
 
     // Performance metrics
-    const gasUseds = successful.filter(m => m.gasUsed).map(m => parseFloat(m.gasUsed!));
-    const gasPrices = successful.filter(m => m.gasPrice).map(m => parseFloat(m.gasPrice!));
+    const gasUseds = successful.filter(m => m.gasUsed).map(m => parseFloat(m.gasUsed!)).filter(val => !isNaN(val));
+    const gasPrices = successful.filter(m => m.gasPrice).map(m => parseFloat(m.gasPrice!)).filter(val => !isNaN(val));
     
     const avgGasUsed = gasUseds.length > 0 
       ? gasUseds.reduce((sum, val) => sum + val, 0) / gasUseds.length 

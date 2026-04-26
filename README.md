@@ -16,13 +16,13 @@ multiple operations into a single programmable and extensible toolkit.
 
 ## ✨ Features
 
-- **🧠 Intelligent Route Optimizer** - Multi-DEX routing with best price discovery
+- ** Intelligent Route Optimizer** - Multi-DEX routing with best price discovery
 - Token swaps on Stellar with optimal routing
 - Cross-chain bridging
 - Liquidity pool (LP) deposits & withdrawals
 - Querying pool reserves and share IDs
-- **� Pre-execution Simulation** - Test transactions safely without spending real funds
-- **� Transaction analytics and performance metrics**
+- **🔮 Pre-execution Simulation** - Test transactions safely without spending real funds
+- ** Transaction analytics and performance metrics**
 - Historical tracking and debugging visibility
 - Risk analytics and insights
 - Custom contract integrations (current)

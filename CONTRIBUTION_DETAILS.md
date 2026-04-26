@@ -1,24 +1,41 @@
 # Contribution Details
 
 ## Overview
-This contribution implements an intelligent route optimizer for Stellar AgentKit that provides multi-DEX routing with best price discovery, addressing the core problem of inefficient trades due to lack of routing optimization. Addresses issue #36 with intelligent routing across multiple DEXes and liquidity pools.
+This contribution implements an intelligent route optimizer for Stellar AgentKit that addresses inefficient trades by providing optimal pricing across multiple DEXes and liquidity pools.
 
 ## Key Features
-- **Multi-DEX Support** - Queries liquidity pools from Horizon and Soroban AMMs
-- **Strategy-Based Optimization** - Best-route, direct, minimal-hops, and split strategies
-- **Multi-Hop Routing** - Finds optimal paths through multiple intermediate assets
-- **Real-time Pool Data** - Caches pool information with freshness guarantees
-- **Price Impact Calculation** - Estimates slippage and market impact for trades
+- **Multi-DEX Routing** - Queries Horizon and Soroban AMM pools for best rates
+- **Strategy-Based Optimization** - 4 strategies: best-route, direct, minimal-hops, split
+- **Multi-Hop Discovery** - Finds optimal paths through intermediate assets
+- **Real-time Data** - 30-second cached pool data with automatic refresh
+- **Price Impact Analysis** - Estimates slippage and market impact
 
 ## Technical Implementation
 **New Files:**
-- `lib/metrics.ts` - Core metrics collection system (266 lines)
-- `tests/unit/metrics.test.ts` - Test suite (415 lines) 
-- `examples/metrics-example.ts` - Usage examples (213 lines)
+- `lib/routeOptimizer.ts` - Core routing engine (500+ lines)
+- `tests/unit/routeOptimizer.test.ts` - Comprehensive test suite
+- `examples/route-optimizer-example.ts` - Usage examples
+- `docs/route-optimizer.md` - Complete documentation
 
 **Modified Files:**
-- `agent.ts` - Integrated metrics tracking (+100 lines)
-- `README.md` - Added documentation (+140 lines)
+- `agent.ts` - Added `swapOptimized()` method (+50 lines)
+- `README.md` - Added routing documentation (+50 lines)
+
+## Usage
+```typescript
+await agent.swapOptimized({
+  strategy: "best-route",
+  sendAsset: { type: "native" },
+  destAsset: { code: "USDC", issuer: "GB..." },
+  sendAmount: "100"
+});
+```
+
+## Impact
+- **Better Pricing** - Always get optimal rates across all pools
+- **Reduced Slippage** - Intelligent routing minimizes market impact
+- **Developer Experience** - Drop-in replacement with rich analytics
+- **Ecosystem Enhancement** - Transforms AgentKit into sophisticated routing platform
 
 ## Critical Fixes
 - Fixed LP deposit precision issues (parseFloat → Number())

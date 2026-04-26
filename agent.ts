@@ -239,49 +239,8 @@ export class AgentClient {
     inMax: string;
     contractAddress?: string;
   }) {
-    const startTime = Date.now();
-    const metricId = this.metricsCollector.recordTransaction({
-      type: 'swap',
-      status: 'pending',
-      amount: params.out,
-      toAddress: params.to,
-      fromAddress: this.publicKey,
-      contractAddress: params.contractAddress,
-    });
-
-    try {
-      const result = await contractSwap(
-        this.publicKey,
-        params.to,
-        params.buyA,
-        params.out,
-        params.inMax,
-        { network: this.network, rpcUrl: this.rpcUrl, contractAddress: params.contractAddress }
-      );
-
-      const executionTime = Date.now() - startTime;
-      
-      // Update transaction with success status and additional data
-      this.metricsCollector.updateTransactionStatus(metricId, 'success', {
-        executionTime,
-        transactionHash: typeof result === 'string' ? result : result?.hash || 'unknown',
-        status: 'success'
-      });
-
-      return result;
-    } catch (error) {
-      const executionTime = Date.now() - startTime;
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      
-      // Update transaction with failed status
-      this.metricsCollector.updateTransactionStatus(metricId, 'failed', {
-        executionTime,
-        errorMessage,
-        status: 'failed'
-      });
-
-      throw error;
-    }
+    // Delegate to the main swap method to avoid duplication
+    return this.swap(params);
   }
 
   /**
@@ -632,19 +591,34 @@ export class AgentClient {
         // without actually executing the bridge transaction
         const targetChain = params.targetChain ?? "ethereum";
         
-        // Validate bridge parameters (similar to actual bridge but without execution)
-        const { fromAddress } = await import("./tools/bridge").then(m => m.validateBridgeEnv(
-          this.network === "mainnet" ? "stellar-mainnet" : "stellar-testnet"
-        ));
+        // For simulation, try to validate bridge parameters but don't block if env vars are missing
+        let fromAddress = this.publicKey;
+        try {
+          const bridgeEnv = await import("./tools/bridge").then(m => m.validateBridgeEnv(
+            this.network === "mainnet" ? "stellar-mainnet" : "stellar-testnet"
+          ));
+          fromAddress = bridgeEnv.fromAddress;
+        } catch (envError) {
+          // Environment validation failed, but we can still provide simulation estimates
+          console.warn("Bridge environment validation failed, providing basic simulation:", envError);
+        }
 
         // Simulate bridge requirements and costs
-        const estimatedFee = targetChain === "ethereum" ? "0.002" : 
-                           targetChain === "polygon" ? "0.001" : 
-                           targetChain === "arbitrum" ? "0.0005" : "0.0008";
+        const feeEstimates = {
+          ethereum: { amount: "0.002", symbol: "ETH" },
+          polygon: { amount: "0.001", symbol: "MATIC" },
+          arbitrum: { amount: "0.0005", symbol: "ETH" },
+          base: { amount: "0.0008", symbol: "ETH" }
+        };
         
-        const estimatedTime = targetChain === "ethereum" ? "15-30" : 
-                            targetChain === "polygon" ? "5-15" : 
-                            targetChain === "arbitrum" ? "10-20" : "5-15";
+        const timeEstimates = {
+          ethereum: "15-30",
+          polygon: "5-15", 
+          arbitrum: "10-20",
+          base: "5-15"
+        };
+
+        const feeInfo = feeEstimates[targetChain];
 
         return {
           status: "simulated",
@@ -654,13 +628,13 @@ export class AgentClient {
             fromAddress,
             toAddress: params.toAddress,
             targetChain,
-            estimatedFee: `${estimatedFee} ETH`,
-            estimatedTimeMinutes: estimatedTime,
+            estimatedFee: `${feeInfo.amount} ${feeInfo.symbol}`,
+            estimatedTimeMinutes: timeEstimates[targetChain],
             requiresTrustline: true
           },
           transactionDetails: {
             operations: 2, // Bridge + potential trustline
-            fee: estimatedFee
+            fee: feeInfo.amount
           }
         };
       } catch (error) {

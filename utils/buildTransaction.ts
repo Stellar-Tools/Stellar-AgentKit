@@ -154,7 +154,9 @@ export function buildTransactionFromXDR(
  * Helper function to check if a transaction has a memo
  */
 function hasMemo(transaction: Transaction): boolean {
-  return transaction.memo !== undefined && transaction.memo.value !== undefined;
+  return transaction.memo !== undefined && 
+         transaction.memo.value !== undefined &&
+         transaction.memo.value !== "";
 }
 
 export function buildPathPaymentTransaction(
