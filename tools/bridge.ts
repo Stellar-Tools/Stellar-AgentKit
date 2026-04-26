@@ -21,8 +21,31 @@ import { z } from "zod";
 
 dotenv.config({ path: ".env" });
 
-const fromAddress = process.env.STELLAR_PUBLIC_KEY as string;
-const privateKey = process.env.STELLAR_PRIVATE_KEY as string;
+// Validate required environment variables
+const fromAddress = process.env.STELLAR_PUBLIC_KEY;
+const privateKey = process.env.STELLAR_PRIVATE_KEY;
+const srbProviderUrl = process.env.SRB_PROVIDER_URL;
+
+if (!fromAddress) {
+  throw new Error(
+    "Missing required environment variable: STELLAR_PUBLIC_KEY. " +
+    "Please set this in your .env file with your Stellar public key."
+  );
+}
+
+if (!privateKey) {
+  throw new Error(
+    "Missing required environment variable: STELLAR_PRIVATE_KEY. " +
+    "Please set this in your .env file with your Stellar private key."
+  );
+}
+
+if (!srbProviderUrl) {
+  throw new Error(
+    "Missing required environment variable: SRB_PROVIDER_URL. " +
+    "Please set this in your .env file with the Soroban RPC provider URL."
+  );
+}
 
 type StellarNetwork = "stellar-testnet" | "stellar-mainnet";
 
@@ -92,14 +115,14 @@ export const bridgeTokenTool = new DynamicStructuredTool({
 
     const sdk = new AllbridgeCoreSdk({
       ...nodeRpcUrlsDefault,
-      SRB: `${process.env.SRB_PROVIDER_URL}`,
+      SRB: srbProviderUrl,
     });
 
     const chainDetailsMap = await sdk.chainDetailsMap();
 
     const sourceToken = ensure(
       chainDetailsMap[ChainSymbol.SRB].tokens.find(
-        (t) => t.symbol === "USDC"
+        (t: any) => t.symbol === "USDC"
       )
     );
 
@@ -108,7 +131,7 @@ export const bridgeTokenTool = new DynamicStructuredTool({
       throw new Error(`Chain not supported by Allbridge: ${targetChain}`);
     }
     const destinationToken = ensure(
-      destinationChainDetails.tokens.find((t) => t.symbol === "USDC")
+      destinationChainDetails.tokens.find((t: any) => t.symbol === "USDC")
     );
 
     const sendParams = {
