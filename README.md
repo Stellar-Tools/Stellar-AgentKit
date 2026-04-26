@@ -16,7 +16,8 @@ multiple operations into a single programmable and extensible toolkit.
 
 ## ✨ Features
 
-- Token swaps on Stellar
+- **🧠 Intelligent Route Optimizer** - Multi-DEX routing with best price discovery
+- Token swaps on Stellar with optimal routing
 - Cross-chain bridging
 - Liquidity pool (LP) deposits & withdrawals
 - Querying pool reserves and share IDs
@@ -106,6 +107,44 @@ To enable mainnet, set allowMainnet: true in your config.
 ## 🔄 Swap Tokens
 
 Perform token swaps on the Stellar network.
+
+### 🧠 Intelligent Route Optimizer
+
+The new route optimizer provides intelligent routing across multiple DEXes and liquidity pools to find the best execution path for your swaps.
+
+```typescript
+// Basic optimized swap
+const result = await agent.swap({
+  strategy: "best-route",
+  sendAsset: { type: "native" }, // XLM
+  destAsset: { code: "USDC", issuer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTBEVCH7NDLF6DIESJAHISV" },
+  sendAmount: "100",
+  slippageBps: 100 // 1% slippage tolerance
+});
+
+console.log(`Swap executed: ${result.actualInput} XLM → ${result.actualOutput} USDC`);
+console.log(`Route: ${result.route.hopCount} hops, confidence: ${(result.route.confidence * 100).toFixed(1)}%`);
+```
+
+**Available Strategies:**
+- `"best-route"` - Maximizes output while considering reliability
+- `"direct"` - Prioritizes single-pool trades
+- `"minimal-hops"` - Finds shortest path between assets
+- `"split"` - Distributes large trades across multiple routes
+
+**Advanced Configuration:**
+```typescript
+const result = await agent.swap({
+  strategy: "best-route",
+  sendAsset: { type: "native" },
+  destAsset: { code: "USDC", issuer: "GB..." },
+  sendAmount: "1000",
+  slippageBps: 200, // 2% slippage
+  maxHops: 3,
+  excludePools: ["high_fee_pool"],
+  preferPools: ["trusted_amm"]
+});
+```
 
 ### Best-Route Swaps on Stellar Classic
 

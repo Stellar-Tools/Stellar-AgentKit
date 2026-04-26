@@ -14,6 +14,13 @@ import {
   type SwapBestRouteParams,
   type SwapBestRouteResult,
 } from "./lib/dex";
+import { 
+  RouteOptimizer, 
+  type OptimizedSwapParams, 
+  type OptimizedSwapResult, 
+  type SwapStrategy,
+  type RouteOption 
+} from "./lib/routeOptimizer";
 import { bridgeTokenTool } from "./tools/bridge";
 import { MetricsCollector, type TransactionMetrics } from "./lib/metrics";
 import {
@@ -67,6 +74,10 @@ export type {
   RouteQuote,
   SwapBestRouteParams,
   SwapBestRouteResult,
+  OptimizedSwapParams,
+  OptimizedSwapResult,
+  SwapStrategy,
+  RouteOption,
 };
 
 export class AgentClient {
@@ -74,6 +85,7 @@ export class AgentClient {
   private publicKey: string;
   private rpcUrl: string;
   private metricsCollector: MetricsCollector;
+  private routeOptimizer: RouteOptimizer;
 
   constructor(config: AgentConfig) {
     // Mainnet safety check for general operations
@@ -102,6 +114,18 @@ export class AgentClient {
       : "https://horizon-testnet.stellar.org");
     this.metricsCollector = new MetricsCollector(config.network);
     
+    // Initialize route optimizer
+    this.routeOptimizer = new RouteOptimizer({
+      network: this.network,
+      horizonUrl: this.rpcUrl,
+      rpcUrl: config.rpcUrl || (config.network === "mainnet"
+        ? "https://soroban.stellar.org"
+        : "https://soroban-testnet.stellar.org"),
+      maxHops: 4,
+      maxRoutes: 10,
+      cacheTimeout: 30
+    });
+    
     if (!this.publicKey && this.network === "testnet") {
         // In a real SDK, we might not throw here if only read-only methods are used,
         // but for this implementation, we'll assume it's needed for most actions.
@@ -109,10 +133,10 @@ export class AgentClient {
   }
 
   /**
-   * Perform a swap on the Stellar network.
+   * Perform a legacy swap on the Stellar network using contracts.
    * @param params Swap parameters
    */
-  async swap(params: {
+  async swapContract(params: {
     to: string;
     buyA: boolean;
     out: string;
@@ -145,6 +169,67 @@ export class AgentClient {
       this.metricsCollector.updateTransactionStatus(metricId, 'success', {
         executionTime,
         transactionHash: typeof result === 'string' ? result : result?.hash || 'unknown',
+        status: 'success'
+      });
+
+      return result;
+    } catch (error) {
+      const executionTime = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Update transaction with failed status
+      this.metricsCollector.updateTransactionStatus(metricId, 'failed', {
+        executionTime,
+        errorMessage,
+        status: 'failed'
+      });
+
+      throw error;
+    }
+  }
+
+  /**
+   * Perform an optimized swap using intelligent routing.
+   * 
+   * This method uses the route optimizer to find the best path across multiple
+   * DEXes and liquidity pools, then executes the swap with optimal pricing.
+   * 
+   * @example
+   * await agent.swap({
+   *   strategy: "best-route",
+   *   sendAsset: { type: "native" },
+   *   destAsset: { code: "USDC", issuer: "GB..." },
+   *   sendAmount: "100"
+   * });
+   * 
+   * @param params Optimized swap parameters
+   * @returns Optimized swap result with route details and execution metrics
+   */
+  async swap(params: OptimizedSwapParams & { destination?: string }): Promise<OptimizedSwapResult> {
+    const startTime = Date.now();
+    const destination = params.destination ?? this.publicKey;
+    
+    const metricId = this.metricsCollector.recordTransaction({
+      type: 'swap',
+      status: 'pending',
+      amount: params.sendAmount ?? params.destAmount ?? '0',
+      toAddress: destination,
+      fromAddress: this.publicKey,
+    });
+
+    try {
+      const result = await this.routeOptimizer.executeOptimizedSwap(
+        params,
+        destination,
+        this.publicKey
+      );
+
+      const executionTime = Date.now() - startTime;
+      
+      // Update transaction with success status and additional data
+      this.metricsCollector.updateTransactionStatus(metricId, 'success', {
+        executionTime,
+        transactionHash: result.transactionHash,
         status: 'success'
       });
 
