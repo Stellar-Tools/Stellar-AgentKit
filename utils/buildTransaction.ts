@@ -122,28 +122,39 @@ export function buildTransactionFromXDR(
   xdrTx: string,
   networkPassphrase: string,
   config: BuildTransactionConfig = {}
-): Transaction {
+): Transaction | FeeBumpTransaction {
   // Reconstruct the transaction from XDR
   const transaction = TransactionBuilder.fromXDR(xdrTx, networkPassphrase);
   
   // Handle both Transaction and FeeBumpTransaction
+  let resultTransaction: Transaction | FeeBumpTransaction;
   let baseTransaction: Transaction;
+  
   if (transaction instanceof FeeBumpTransaction) {
+    // For fee-bump transactions, we need to work with the inner transaction
     baseTransaction = transaction.innerTransaction;
+    resultTransaction = transaction;
   } else if (transaction instanceof Transaction) {
     baseTransaction = transaction;
+    resultTransaction = transaction;
   } else {
     throw new Error("Expected Transaction or FeeBumpTransaction");
   }
   
   // Note: Fee and timeout are already set in the XDR by external SDKs
   // We only apply memo if provided and not already in the transaction
-  if (config.memo && !baseTransaction.memo) {
+  if (config.memo && !hasMemo(baseTransaction)) {
     baseTransaction.memo = Memo.text(config.memo);
   }
 
-  return baseTransaction;
+  return resultTransaction;
+}
 
+/**
+ * Helper function to check if a transaction has a memo
+ */
+function hasMemo(transaction: Transaction): boolean {
+  return transaction.memo !== undefined && transaction.memo.value !== undefined;
 }
 
 export function buildPathPaymentTransaction(

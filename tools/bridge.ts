@@ -23,10 +23,15 @@ dotenv.config({ path: ".env" });
 
 // Validate required environment variables
 // Environment validation moved to runtime to avoid import-time failures
-const validateBridgeEnv = () => {
+export const validateBridgeEnv = (fromNetwork?: StellarNetwork): {
+  fromAddress: string;
+  privateKey: string;
+  srbProviderUrl: string;
+} => {
   const fromAddress = process.env.STELLAR_PUBLIC_KEY;
   const privateKey = process.env.STELLAR_PRIVATE_KEY;
   const srbProviderUrl = process.env.SRB_PROVIDER_URL;
+  const allowMainnetBridge = process.env.ALLOW_MAINNET_BRIDGE === 'true';
 
   if (!fromAddress) {
     throw new Error(
@@ -46,6 +51,16 @@ const validateBridgeEnv = () => {
     throw new Error(
       "Missing required environment variable: SRB_PROVIDER_URL. " +
       "Please set this in your .env file with the Soroban RPC provider URL."
+    );
+  }
+
+  // Mainnet bridge protection
+  if (fromNetwork === 'stellar-mainnet' && !allowMainnetBridge) {
+    throw new Error(
+      " Mainnet bridging is blocked for safety.\n" +
+      "Stellar AgentKit requires explicit opt-in for mainnet bridge operations.\n" +
+      "To enable mainnet bridging, set ALLOW_MAINNET_BRIDGE=true in your .env file.\n" +
+      "This protects against accidental use of real funds in bridge operations."
     );
   }
 
@@ -107,7 +122,7 @@ export const bridgeTokenTool = new DynamicStructuredTool({
     targetChain: TargetChain;
   }) => {
     // Validate environment variables at runtime
-    const { fromAddress, privateKey, srbProviderUrl } = validateBridgeEnv();
+    const { fromAddress, privateKey, srbProviderUrl } = validateBridgeEnv(fromNetwork);
 
     const destinationChainSymbol = TARGET_CHAIN_MAP[targetChain];
 

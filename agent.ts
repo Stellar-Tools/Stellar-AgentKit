@@ -133,6 +133,62 @@ export class AgentClient {
   }
 
   /**
+   * Perform a swap on the Stellar network.
+   * @param params Swap parameters
+   */
+  async swap(params: {
+    to: string;
+    buyA: boolean;
+    out: string;
+    inMax: string;
+    contractAddress?: string;
+  }) {
+    const startTime = Date.now();
+    const metricId = this.metricsCollector.recordTransaction({
+      type: 'swap',
+      status: 'pending',
+      amount: params.out,
+      toAddress: params.to,
+      fromAddress: this.publicKey,
+      contractAddress: params.contractAddress,
+    });
+
+    try {
+      const result = await contractSwap(
+        this.publicKey,
+        params.to,
+        params.buyA,
+        params.out,
+        params.inMax,
+        { network: this.network, rpcUrl: this.rpcUrl, contractAddress: params.contractAddress }
+      );
+
+      const executionTime = Date.now() - startTime;
+      
+      // Update transaction with success status and additional data
+      this.metricsCollector.updateTransactionStatus(metricId, 'success', {
+        executionTime,
+        transactionHash: typeof result === 'string' ? result : result?.hash || 'unknown',
+        status: 'success'
+      });
+
+      return result;
+    } catch (error) {
+      const executionTime = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Update transaction with failed status
+      this.metricsCollector.updateTransactionStatus(metricId, 'failed', {
+        executionTime,
+        errorMessage,
+        status: 'failed'
+      });
+
+      throw error;
+    }
+  }
+
+  /**
    * Perform a legacy swap on the Stellar network using contracts.
    * @param params Swap parameters
    */
@@ -195,7 +251,7 @@ export class AgentClient {
    * DEXes and liquidity pools, then executes the swap with optimal pricing.
    * 
    * @example
-   * await agent.swap({
+   * await agent.swapOptimized({
    *   strategy: "best-route",
    *   sendAsset: { type: "native" },
    *   destAsset: { code: "USDC", issuer: "GB..." },
@@ -205,7 +261,7 @@ export class AgentClient {
    * @param params Optimized swap parameters
    * @returns Optimized swap result with route details and execution metrics
    */
-  async swap(params: OptimizedSwapParams & { destination?: string }): Promise<OptimizedSwapResult> {
+  async swapOptimized(params: OptimizedSwapParams & { destination?: string }): Promise<OptimizedSwapResult> {
     const startTime = Date.now();
     const destination = params.destination ?? this.publicKey;
     
@@ -294,11 +350,14 @@ export class AgentClient {
 
       const executionTime = Date.now() - startTime;
       
-      // Update transaction with success status and additional data
-      this.metricsCollector.updateTransactionStatus(metricId, 'success', {
+      // Update transaction with appropriate status based on bridge result
+      const transactionStatus = result.status === 'confirmed' ? 'success' : 
+                              result.status === 'failed' ? 'failed' : 'pending';
+      
+      this.metricsCollector.updateTransactionStatus(metricId, transactionStatus, {
         executionTime,
         transactionHash: result.hash,
-        status: result.status === 'confirmed' ? 'success' : 'pending'
+        status: transactionStatus
       });
 
       return result;
@@ -330,7 +389,7 @@ export class AgentClient {
       contractAddress?: string;
     }) => {
       const startTime = Date.now();
-      const totalAmount = (Number(params.desiredA) + Number(params.desiredB)).toString();
+      const totalAmount = (parseFloat(params.desiredA) + parseFloat(params.desiredB)).toString();
       const metricId = this.metricsCollector.recordTransaction({
         type: 'deposit',
         status: 'pending',

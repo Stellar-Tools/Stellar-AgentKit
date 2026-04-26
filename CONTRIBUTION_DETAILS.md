@@ -1,13 +1,14 @@
 # Contribution Details
 
 ## Overview
-This contribution implements a comprehensive transaction analytics and performance metrics system for Stellar AgentKit, transforming it from "blind execution infrastructure" into a full-featured analytics platform. Addresses issue #38 with historical tracking, performance insights, debugging visibility, and risk analytics.
+This contribution implements an intelligent route optimizer for Stellar AgentKit that provides multi-DEX routing with best price discovery, addressing the core problem of inefficient trades due to lack of routing optimization. Addresses issue #36 with intelligent routing across multiple DEXes and liquidity pools.
 
 ## Key Features
-- **Automatic Transaction Tracking** - All swaps, bridges, and LP operations tracked with timestamps, execution times, gas usage
-- **Persistent Storage** - Metrics saved to `~/.stellartools/metrics-{network}.json`
-- **Comprehensive API** - `agent.metrics.summary()` provides volume, success rates, slippage, execution times
-- **Export/Import** - Data portability for dashboard integration
+- **Multi-DEX Support** - Queries liquidity pools from Horizon and Soroban AMMs
+- **Strategy-Based Optimization** - Best-route, direct, minimal-hops, and split strategies
+- **Multi-Hop Routing** - Finds optimal paths through multiple intermediate assets
+- **Real-time Pool Data** - Caches pool information with freshness guarantees
+- **Price Impact Calculation** - Estimates slippage and market impact for trades
 
 ## Technical Implementation
 **New Files:**

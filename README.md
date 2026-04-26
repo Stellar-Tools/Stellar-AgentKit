@@ -114,7 +114,7 @@ The new route optimizer provides intelligent routing across multiple DEXes and l
 
 ```typescript
 // Basic optimized swap
-const result = await agent.swap({
+const result = await agent.swapOptimized({
   strategy: "best-route",
   sendAsset: { type: "native" }, // XLM
   destAsset: { code: "USDC", issuer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTBEVCH7NDLF6DIESJAHISV" },
@@ -134,7 +134,7 @@ console.log(`Route: ${result.route.hopCount} hops, confidence: ${(result.route.c
 
 **Advanced Configuration:**
 ```typescript
-const result = await agent.swap({
+const result = await agent.swapOptimized({
   strategy: "best-route",
   sendAsset: { type: "native" },
   destAsset: { code: "USDC", issuer: "GB..." },

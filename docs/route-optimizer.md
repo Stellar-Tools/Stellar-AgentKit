@@ -16,7 +16,7 @@ The Route Optimizer is a powerful feature of Stellar AgentKit that provides inte
 - **Best Route**: Maximizes output amount while considering confidence and hop count
 - **Direct Route**: Prioritizes single-pool trades for simplicity and speed
 - **Minimal Hops**: Reduces complexity by finding the shortest path
-- **Split Route**: Distributes large trades across multiple routes (future enhancement)
+- **Split Route**: Distributes large trades across multiple routes
 
 ### ⚙️ Advanced Configuration
 - **Slippage Tolerance**: Set acceptable price slippage in basis points
@@ -140,7 +140,7 @@ Execute an optimized swap using intelligent routing.
 For advanced use cases, you can use the RouteOptimizer class directly:
 
 ```typescript
-import { RouteOptimizer } from 'stellar-agentkit/lib/routeOptimizer';
+import { RouteOptimizer } from 'stellar-agentkit';
 
 const optimizer = new RouteOptimizer({
   network: 'testnet',

@@ -16,10 +16,15 @@ describe('MetricsCollector', () => {
       unlinkSync(testMetricsFile);
     }
     
+    // Create the test directory if it doesn't exist
+    if (!existsSync(testDataDir)) {
+      writeFileSync(testDataDir, ''); // Create directory marker
+    }
+    
     // Create a mock MetricsCollector that uses the test directory
     metricsCollector = new MetricsCollector(testNetwork as any);
     
-    // Override the metrics file path to use test directory
+    // Override the metrics file path to use test directory BEFORE any operations
     (metricsCollector as any).metricsFile = testMetricsFile;
     
     // Clear any existing metrics to ensure clean test state

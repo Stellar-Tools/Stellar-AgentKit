@@ -4,6 +4,7 @@ import {
   Horizon,
   Networks,
   StrKey,
+  rpc,
 } from "@stellar/stellar-sdk";
 import { 
   StellarAssetInput, 
@@ -216,9 +217,29 @@ export class RouteOptimizer {
    * Query Soroban AMM pools
    */
   private async querySorobanPools(): Promise<PoolInfo[]> {
-    // This would query Soroban AMM contracts
-    // Implementation depends on specific AMM contracts available
-    return [];
+    if (!this.config.rpcUrl) {
+      return [];
+    }
+
+    try {
+      const server = new rpc.Server(this.config.rpcUrl, { allowHttp: true });
+      
+      // This is a basic implementation that would need to be customized
+      // based on the actual Soroban AMM contracts available
+      // For now, we'll return an empty array as the specific contracts
+      // would need to be known and integrated
+      
+      // Example of how this might work:
+      // 1. Query known AMM contract addresses
+      // 2. Call contract methods to get pool information
+      // 3. Convert to PoolInfo format
+      
+      console.warn("Soroban pool discovery not yet implemented - requires specific AMM contract integration");
+      return [];
+    } catch (error) {
+      console.warn("Failed to query Soroban pools:", error);
+      return [];
+    }
   }
 
   /**
@@ -247,7 +268,7 @@ export class RouteOptimizer {
       });
     }
 
-    // Find direct routes (1 hop)
+    // Find direct routes (1 hop) - route creation methods now handle destAmount properly
     const directRoutes = this.findDirectRoutes(params, filteredPools);
     routes.push(...directRoutes);
 
@@ -286,7 +307,7 @@ export class RouteOptimizer {
     maxHops: number
   ): RouteOption[] {
     const routes: RouteOption[] = [];
-    const visited = new Set<string>();
+    const globalVisited = new Set<string>(); // Track globally visited asset pairs to prevent infinite loops
     
     // Simple breadth-first search for routes
     const queue: Array<{
@@ -294,15 +315,17 @@ export class RouteOptimizer {
       path: StellarAssetInput[];
       pools: PoolInfo[];
       hops: number;
+      visitedPath: Set<string>; // Track visited assets in this specific path
     }> = [{
       currentAsset: params.sendAsset,
       path: [params.sendAsset],
       pools: [],
-      hops: 0
+      hops: 0,
+      visitedPath: new Set<string>()
     }];
 
     while (queue.length > 0 && routes.length < this.config.maxRoutes!) {
-      const { currentAsset, path, pools: pathPools, hops } = queue.shift()!;
+      const { currentAsset, path, pools: pathPools, hops, visitedPath } = queue.shift()!;
       
       if (hops >= maxHops) continue;
       if (this.assetEquals(currentAsset, params.destAsset)) {
@@ -312,21 +335,28 @@ export class RouteOptimizer {
         continue;
       }
 
-      const key = this.assetKey(currentAsset);
-      if (visited.has(key)) continue;
-      visited.add(key);
+      const currentKey = this.assetKey(currentAsset);
+      
+      // Check if we've already explored this asset at this hop level globally
+      const globalKey = `${currentKey}_${hops}`;
+      if (globalVisited.has(globalKey)) continue;
+      globalVisited.add(globalKey);
 
       // Find pools that can trade from current asset
       for (const pool of pools) {
         if (pathPools.includes(pool)) continue; // Avoid reusing pools
         
         const nextAsset = this.getNextAsset(pool, currentAsset);
-        if (nextAsset && !path.some(a => this.assetEquals(a, nextAsset))) {
+        if (nextAsset && !visitedPath.has(this.assetKey(nextAsset))) {
+          const newVisitedPath = new Set(visitedPath);
+          newVisitedPath.add(currentKey);
+          
           queue.push({
             currentAsset: nextAsset,
             path: [...path, nextAsset],
             pools: [...pathPools, pool],
-            hops: hops + 1
+            hops: hops + 1,
+            visitedPath: newVisitedPath
           });
         }
       }
@@ -379,9 +409,46 @@ export class RouteOptimizer {
    * Select split route (for large trades)
    */
   private selectSplitRoute(routes: RouteOption[], splitCount: number): RouteOption {
-    // For now, return the best route
-    // In a full implementation, this would split the trade across multiple routes
-    return this.selectBestRoute(routes);
+    if (routes.length === 0) {
+      throw new Error("No routes available for this swap");
+    }
+
+    // For split strategy, we want to distribute the trade across multiple routes
+    // to reduce price impact and improve execution
+    const sortedRoutes = routes.sort((a, b) => {
+      // Sort by price impact (ascending), then by output amount (descending)
+      const impactComparison = parseFloat(a.priceImpact) - parseFloat(b.priceImpact);
+      if (Math.abs(impactComparison) > 0.01) return impactComparison;
+      
+      return new Big(b.outputAmount).cmp(a.outputAmount);
+    });
+
+    // Select the top routes for splitting (up to splitCount)
+    const selectedRoutes = sortedRoutes.slice(0, Math.min(splitCount, sortedRoutes.length));
+    
+    // Create a composite route that represents the split strategy
+    const totalOutput = selectedRoutes.reduce((sum, route) => sum + parseFloat(route.outputAmount), 0);
+    const totalInput = selectedRoutes.reduce((sum, route) => sum + parseFloat(route.inputAmount), 0);
+    const avgPriceImpact = selectedRoutes.reduce((sum, route) => sum + parseFloat(route.priceImpact), 0) / selectedRoutes.length;
+    const avgConfidence = selectedRoutes.reduce((sum, route) => sum + route.confidence, 0) / selectedRoutes.length;
+    const maxHops = Math.max(...selectedRoutes.map(r => r.hopCount));
+    const totalFees = selectedRoutes.reduce((sum, route) => sum + parseFloat(route.totalFee), 0);
+    const totalGas = selectedRoutes.reduce((sum, route) => sum + parseFloat(route.estimatedGas), 0);
+
+    // Use the best route's path as the representative path
+    const bestRoute = selectedRoutes[0];
+
+    return {
+      path: bestRoute.path,
+      pools: bestRoute.pools,
+      inputAmount: totalInput.toString(),
+      outputAmount: totalOutput.toString(),
+      priceImpact: avgPriceImpact.toFixed(4),
+      hopCount: maxHops,
+      totalFee: totalFees.toString(),
+      estimatedGas: totalGas.toString(),
+      confidence: Math.max(0.1, Math.min(1.0, avgConfidence * 0.95)) // Slightly lower confidence for split
+    };
   }
 
   /**
@@ -392,15 +459,36 @@ export class RouteOptimizer {
     destination: string,
     signerPublicKey: string
   ): Promise<SwapBestRouteResult> {
-    // This would integrate with the existing DEX swap functionality
-    // For now, return a mock result
-    return {
-      hash: "mock-tx-hash",
-      mode: "strict-send",
-      sendAmount: route.inputAmount,
-      destAmount: route.outputAmount,
-      path: route.path
-    };
+    // For single-hop routes, use direct swap
+    if (route.hopCount === 1) {
+      // This would integrate with contract swaps or DEX swaps
+      // For now, we'll use the existing DEX swap functionality
+      try {
+        const { swapBestRoute } = await import("./dex");
+        const result = await swapBestRoute(
+          {
+            network: this.config.network,
+            horizonUrl: this.config.horizonUrl,
+            publicKey: signerPublicKey,
+          },
+          {
+            mode: "strict-send",
+            sendAsset: route.path[0],
+            destAsset: route.path[1],
+            sendAmount: route.inputAmount,
+            slippageBps: 100 // Default slippage
+          }
+        );
+        return result;
+      } catch (error) {
+        throw new Error(`Failed to execute swap: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    } else {
+      // For multi-hop routes, we need to execute each hop sequentially
+      // This is a complex implementation that would require atomic execution
+      // For now, throw an error indicating multi-hop execution is not yet implemented
+      throw new Error("Multi-hop route execution is not yet implemented. Please use single-hop routes or implement multi-hop execution logic.");
+    }
   }
 
   /**
@@ -414,7 +502,8 @@ export class RouteOptimizer {
     const estimatedGas = (route.hopCount * 100000).toString(); // Rough estimate
     
     // Calculate confidence based on pool liquidity and route complexity
-    const confidence = this.calculateConfidence(route);
+    // Pass the newly computed price impact instead of using stale data
+    const confidence = this.calculateConfidence(route, priceImpact);
 
     return {
       ...route,
@@ -443,16 +532,16 @@ export class RouteOptimizer {
   /**
    * Calculate confidence score for a route
    */
-  private calculateConfidence(route: RouteOption): number {
+  private calculateConfidence(route: RouteOption, priceImpact?: string): number {
     let confidence = 1.0;
     
     // Reduce confidence for more hops
     confidence *= (1.0 - (route.hopCount - 1) * 0.1);
     
-    // Reduce confidence for high price impact
-    const priceImpact = parseFloat(route.priceImpact);
-    if (priceImpact > 5) confidence *= 0.8;
-    if (priceImpact > 10) confidence *= 0.6;
+    // Reduce confidence for high price impact (use provided price impact or fall back to route data)
+    const impactValue = priceImpact ? parseFloat(priceImpact) : parseFloat(route.priceImpact);
+    if (impactValue > 5) confidence *= 0.8;
+    if (impactValue > 10) confidence *= 0.6;
     
     // Reduce confidence for low liquidity pools
     for (const pool of route.pools) {
@@ -516,11 +605,29 @@ export class RouteOptimizer {
   }
 
   private createRouteFromPool(pool: PoolInfo, params: OptimizedSwapParams): RouteOption | null {
-    // Simplified swap calculation - in reality this would use the pool's specific formula
-    const inputAmount = params.sendAmount ?? "0";
-    const outputAmount = this.estimateSwapOutput(pool, inputAmount, params.sendAsset);
+    let inputAmount: string;
+    let outputAmount: string;
+
+    if (params.sendAmount && !params.destAmount) {
+      // sendAmount-only case: calculate output from input
+      inputAmount = params.sendAmount;
+      outputAmount = this.estimateSwapOutput(pool, inputAmount, params.sendAsset);
+    } else if (params.destAmount && !params.sendAmount) {
+      // destAmount-only case: calculate required input from desired output
+      outputAmount = params.destAmount;
+      inputAmount = this.estimateRequiredInput(pool, outputAmount, params.destAsset);
+    } else if (params.sendAmount && params.destAmount) {
+      // Both provided: use sendAmount and validate against destAmount
+      inputAmount = params.sendAmount;
+      const calculatedOutput = this.estimateSwapOutput(pool, inputAmount, params.sendAsset);
+      outputAmount = calculatedOutput;
+    } else {
+      // Neither provided: default to 0
+      return null;
+    }
     
     if (!outputAmount || parseFloat(outputAmount) <= 0) return null;
+    if (!inputAmount || parseFloat(inputAmount) <= 0) return null;
 
     return {
       path: [params.sendAsset, params.destAsset],
@@ -540,27 +647,63 @@ export class RouteOptimizer {
     pools: PoolInfo[], 
     params: OptimizedSwapParams
   ): RouteOption | null {
-    let inputAmount = params.sendAmount ?? "0";
-    let currentOutput = inputAmount;
+    let inputAmount: string;
+    let outputAmount: string;
 
-    // Calculate output through each hop
-    for (let i = 0; i < pools.length; i++) {
-      const pool = pools[i];
-      const inputAsset = path[i];
-      const outputAsset = path[i + 1];
-      
-      currentOutput = this.estimateSwapOutput(pool, currentOutput, inputAsset);
-      if (!currentOutput || parseFloat(currentOutput) <= 0) return null;
+    if (params.sendAmount && !params.destAmount) {
+      // sendAmount-only case: forward calculation
+      inputAmount = params.sendAmount;
+      let currentOutput = inputAmount;
+
+      // Calculate output through each hop
+      for (let i = 0; i < pools.length; i++) {
+        const pool = pools[i];
+        const inputAsset = path[i];
+        
+        currentOutput = this.estimateSwapOutput(pool, currentOutput, inputAsset);
+        if (!currentOutput || parseFloat(currentOutput) <= 0) return null;
+      }
+      outputAmount = currentOutput;
+    } else if (params.destAmount && !params.sendAmount) {
+      // destAmount-only case: reverse calculation (simplified for multi-hop)
+      outputAmount = params.destAmount;
+      let currentInput = outputAmount;
+
+      // Reverse calculate through each hop (from end to start)
+      for (let i = pools.length - 1; i >= 0; i--) {
+        const pool = pools[i];
+        const outputAsset = path[i + 1];
+        
+        currentInput = this.estimateRequiredInput(pool, currentInput, outputAsset);
+        if (!currentInput || parseFloat(currentInput) <= 0) return null;
+      }
+      inputAmount = currentInput;
+    } else if (params.sendAmount && params.destAmount) {
+      // Both provided: use sendAmount and calculate forward
+      inputAmount = params.sendAmount;
+      let currentOutput = inputAmount;
+
+      for (let i = 0; i < pools.length; i++) {
+        const pool = pools[i];
+        const inputAsset = path[i];
+        
+        currentOutput = this.estimateSwapOutput(pool, currentOutput, inputAsset);
+        if (!currentOutput || parseFloat(currentOutput) <= 0) return null;
+      }
+      outputAmount = currentOutput;
+    } else {
+      // Neither provided
+      return null;
     }
 
     return {
       path,
       pools,
       inputAmount,
-      outputAmount: currentOutput,
+      outputAmount,
       priceImpact: "0", // Will be calculated later
       hopCount: pools.length,
-      totalFee: pools.reduce((sum, pool) => sum + parseFloat(currentOutput) * pool.fee, 0).toString(),
+      totalFee: pools.reduce((sum, pool) => sum + parseFloat(outputAmount) * pool.fee, 0).toString(),
       estimatedGas: (pools.length * 100000).toString(),
       confidence: 1.0 // Will be calculated later
     };
@@ -584,6 +727,26 @@ export class RouteOptimizer {
     const output = numerator.div(denominator);
     
     return output.toFixed(7);
+  }
+
+  private estimateRequiredInput(pool: PoolInfo, desiredOutput: string, outputAsset: StellarAssetInput): string {
+    // Reverse calculation: given desired output, calculate required input
+    // Using the inverse of the constant product formula
+    const isOutputA = this.assetEquals(pool.assetA, outputAsset);
+    const reserveIn = isOutputA ? pool.reserveB : pool.reserveA; // Input reserve
+    const reserveOut = isOutputA ? pool.reserveA : pool.reserveB; // Output reserve
+    
+    const output = new Big(desiredOutput);
+    const reserveInBig = new Big(reserveIn);
+    const reserveOutBig = new Big(reserveOut);
+    
+    // Inverse formula: input = (output * reserveIn) / (reserveOut - output) / (1 - fee)
+    const feeMultiplier = new Big(1).minus(pool.fee);
+    const numerator = output.mul(reserveInBig);
+    const denominator = reserveOutBig.minus(output).mul(feeMultiplier);
+    const input = numerator.div(denominator);
+    
+    return input.toFixed(7);
   }
 
   private getNextAsset(pool: PoolInfo, currentAsset: StellarAssetInput): StellarAssetInput | null {

@@ -189,7 +189,10 @@ export class MetricsCollector {
     // Calculate average slippage
     const slippageValues = successful
       .filter(m => m.slippage)
-      .map(m => parseFloat(m.slippage!.replace('%', '')));
+      .map(m => {
+        const parsed = parseFloat(m.slippage!.replace('%', ''));
+        return isNaN(parsed) ? 0 : parsed;
+      });
     
     const avgSlippage = slippageValues.length > 0
       ? (slippageValues.reduce((sum, val) => sum + val, 0) / slippageValues.length).toFixed(2) + '%'
