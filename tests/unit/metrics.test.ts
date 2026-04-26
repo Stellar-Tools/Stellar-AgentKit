@@ -7,7 +7,7 @@ import { homedir } from 'os';
 describe('MetricsCollector', () => {
   let metricsCollector: MetricsCollector;
   const testNetwork = 'testnet';
-  const testDataDir = join(homedir(), '.stellartools');
+  const testDataDir = join(homedir(), '.stellartools-test'); // Use isolated test directory
 
   beforeEach(() => {
     // Clean up any existing test metrics file
@@ -16,7 +16,14 @@ describe('MetricsCollector', () => {
       unlinkSync(testMetricsFile);
     }
     
-    metricsCollector = new MetricsCollector(testNetwork);
+    // Create a mock MetricsCollector that uses the test directory
+    metricsCollector = new MetricsCollector(testNetwork as any);
+    
+    // Override the metrics file path to use test directory
+    (metricsCollector as any).metricsFile = testMetricsFile;
+    
+    // Clear any existing metrics to ensure clean test state
+    metricsCollector.clearMetrics();
   });
 
   afterEach(() => {
@@ -360,21 +367,51 @@ describe('MetricsCollector', () => {
   });
 
   describe('persistence', () => {
-    it('should persist metrics to file system', () => {
+    it('should persist metrics to file system', async () => {
+      // Use a completely isolated test setup
+      const isolatedTestNetwork = 'isolated-test';
+      const isolatedMetricsFile = join(testDataDir, `metrics-${isolatedTestNetwork}.json`);
+      
+      // Clean up any existing isolated test file
+      if (existsSync(isolatedMetricsFile)) {
+        unlinkSync(isolatedMetricsFile);
+      }
+      
+      // Create isolated collector
+      const isolatedCollector = new MetricsCollector(isolatedTestNetwork as any);
+      (isolatedCollector as any).metricsFile = isolatedMetricsFile;
+      isolatedCollector.clearMetrics();
+      
       // Add a transaction
-      metricsCollector.recordTransaction({
+      isolatedCollector.recordTransaction({
         type: 'swap',
         status: 'success',
         amount: '100',
       });
 
+      // Wait for async save to complete (debounced save)
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // Check if file was created
+      expect(existsSync(isolatedMetricsFile)).toBe(true);
+
       // Create new collector (should load from file)
-      const newCollector = new MetricsCollector(testNetwork);
+      const newCollector = new MetricsCollector(isolatedTestNetwork as any);
+      (newCollector as any).metricsFile = isolatedMetricsFile;
+      
+      // Force reload from file
+      (newCollector as any).loadMetrics();
+      
       const transactions = newCollector.getTransactions();
       
       expect(transactions).toHaveLength(1);
       expect(transactions[0].type).toBe('swap');
       expect(transactions[0].amount).toBe('100');
+      
+      // Clean up isolated test file
+      if (existsSync(isolatedMetricsFile)) {
+        unlinkSync(isolatedMetricsFile);
+      }
     });
   });
 });

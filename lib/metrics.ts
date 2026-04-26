@@ -1,6 +1,8 @@
 import { writeFileSync, readFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { homedir } from 'os';
+
+export type NetworkType = "testnet" | "mainnet";
 
 export interface TransactionMetrics {
   id: string;
@@ -51,12 +53,12 @@ export interface MetricsSummary {
 }
 
 export class MetricsCollector {
-  private metricsFile: string;
   private metrics: TransactionMetrics[] = [];
+  private metricsFile: string;
+  private saveTimeout: NodeJS.Timeout | null = null;
 
-  constructor(network: 'testnet' | 'mainnet' = 'testnet') {
-    const dataDir = join(homedir(), '.stellartools');
-    this.metricsFile = join(dataDir, `metrics-${network}.json`);
+  constructor(network: NetworkType) {
+    this.metricsFile = join(homedir(), '.stellartools', `metrics-${network}.json`);
     this.loadMetrics();
   }
 
@@ -67,21 +69,28 @@ export class MetricsCollector {
         this.metrics = JSON.parse(data);
       }
     } catch (error) {
-      console.warn('Failed to load metrics, starting fresh:', error);
+      console.error('Failed to load metrics:', error);
       this.metrics = [];
     }
   }
 
   private saveMetrics(): void {
-    try {
-      const dataDir = join(homedir(), '.stellartools');
-      if (!existsSync(dataDir)) {
-        require('fs').mkdirSync(dataDir, { recursive: true });
-      }
-      writeFileSync(this.metricsFile, JSON.stringify(this.metrics, null, 2));
-    } catch (error) {
-      console.error('Failed to save metrics:', error);
+    // Debounce saves to avoid blocking the event loop
+    if (this.saveTimeout) {
+      clearTimeout(this.saveTimeout);
     }
+    
+    this.saveTimeout = setTimeout(() => {
+      try {
+        const dataDir = dirname(this.metricsFile);
+        if (!existsSync(dataDir)) {
+          require('fs').mkdirSync(dataDir, { recursive: true });
+        }
+        require('fs').writeFileSync(this.metricsFile, JSON.stringify(this.metrics, null, 2));
+      } catch (error) {
+        console.error('Failed to save metrics:', error);
+      }
+    }, 100); // Debounce for 100ms
   }
 
   recordTransaction(metric: Omit<TransactionMetrics, 'id' | 'timestamp'>): string {
@@ -102,7 +111,9 @@ export class MetricsCollector {
     if (index !== -1) {
       this.metrics[index].status = status;
       if (additionalData) {
-        Object.assign(this.metrics[index], additionalData);
+        // Prevent overwrite of protected fields
+        const { id: _id, timestamp: _timestamp, status: _status, ...safeData } = additionalData;
+        Object.assign(this.metrics[index], safeData);
       }
       this.saveMetrics();
     }
@@ -164,7 +175,8 @@ export class MetricsCollector {
     // Calculate total volume
     const totalVolume = successful.reduce((sum, m) => {
       if (m.amount) {
-        return sum + parseFloat(m.amount);
+        const amount = parseFloat(m.amount);
+        return sum + (isNaN(amount) ? 0 : amount);
       }
       return sum;
     }, 0);
@@ -185,7 +197,7 @@ export class MetricsCollector {
 
     // Calculate average execution time
     const executionTimes = successful
-      .filter(m => m.executionTime)
+      .filter(m => m.executionTime !== undefined)
       .map(m => m.executionTime!);
     
     const avgExecutionTime = executionTimes.length > 0

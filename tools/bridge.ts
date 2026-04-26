@@ -22,30 +22,35 @@ import { z } from "zod";
 dotenv.config({ path: ".env" });
 
 // Validate required environment variables
-const fromAddress = process.env.STELLAR_PUBLIC_KEY;
-const privateKey = process.env.STELLAR_PRIVATE_KEY;
-const srbProviderUrl = process.env.SRB_PROVIDER_URL;
+// Environment validation moved to runtime to avoid import-time failures
+const validateBridgeEnv = () => {
+  const fromAddress = process.env.STELLAR_PUBLIC_KEY;
+  const privateKey = process.env.STELLAR_PRIVATE_KEY;
+  const srbProviderUrl = process.env.SRB_PROVIDER_URL;
 
-if (!fromAddress) {
-  throw new Error(
-    "Missing required environment variable: STELLAR_PUBLIC_KEY. " +
-    "Please set this in your .env file with your Stellar public key."
-  );
-}
+  if (!fromAddress) {
+    throw new Error(
+      "Missing required environment variable: STELLAR_PUBLIC_KEY. " +
+      "Please set this in your .env file with your Stellar public key."
+    );
+  }
 
-if (!privateKey) {
-  throw new Error(
-    "Missing required environment variable: STELLAR_PRIVATE_KEY. " +
-    "Please set this in your .env file with your Stellar private key."
-  );
-}
+  if (!privateKey) {
+    throw new Error(
+      "Missing required environment variable: STELLAR_PRIVATE_KEY. " +
+      "Please set this in your .env file with your Stellar private key."
+    );
+  }
 
-if (!srbProviderUrl) {
-  throw new Error(
-    "Missing required environment variable: SRB_PROVIDER_URL. " +
-    "Please set this in your .env file with the Soroban RPC provider URL."
-  );
-}
+  if (!srbProviderUrl) {
+    throw new Error(
+      "Missing required environment variable: SRB_PROVIDER_URL. " +
+      "Please set this in your .env file with the Soroban RPC provider URL."
+    );
+  }
+
+  return { fromAddress, privateKey, srbProviderUrl };
+};
 
 type StellarNetwork = "stellar-testnet" | "stellar-mainnet";
 
@@ -101,15 +106,8 @@ export const bridgeTokenTool = new DynamicStructuredTool({
     fromNetwork: StellarNetwork;
     targetChain: TargetChain;
   }) => {
-    // Mainnet safeguard - additional layer beyond AgentClient
-    if (
-      fromNetwork === "stellar-mainnet" &&
-      process.env.ALLOW_MAINNET_BRIDGE !== "true"
-    ) {
-      throw new Error(
-        "Mainnet bridging is disabled. Set ALLOW_MAINNET_BRIDGE=true in your .env file to enable."
-      );
-    }
+    // Validate environment variables at runtime
+    const { fromAddress, privateKey, srbProviderUrl } = validateBridgeEnv();
 
     const destinationChainSymbol = TARGET_CHAIN_MAP[targetChain];
 

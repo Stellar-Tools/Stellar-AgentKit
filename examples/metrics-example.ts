@@ -189,11 +189,18 @@ async function realWorldUsage() {
   tomorrow.setDate(tomorrow.getDate() + 1);
   
   const todayTransactions = agent.metrics.getTransactionsByDateRange(today, tomorrow);
-  const todaySummary = agent.metrics.summary();
+  
+  // Calculate today's metrics from today's transactions
+  const todayVolume = todayTransactions
+    .filter(tx => tx.status === 'success')
+    .reduce((sum, tx) => sum + (parseFloat(tx.amount || '0') || 0), 0);
+  const todaySuccessRate = todayTransactions.length > 0 
+    ? ((todayTransactions.filter(tx => tx.status === 'success').length / todayTransactions.length) * 100).toFixed(2) + '%'
+    : '0%';
   
   console.log(`Transactions today: ${todayTransactions.length}`);
-  console.log(`Volume today: ${todaySummary.totalVolume}`);
-  console.log(`Success rate today: ${todaySummary.successRate}`);
+  console.log(`Volume today: ${todayVolume.toString()}`);
+  console.log(`Success rate today: ${todaySuccessRate}`);
   
   // Export data for dashboard
   const dashboardData = agent.metrics.export();

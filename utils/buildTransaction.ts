@@ -7,6 +7,7 @@ import {
   BASE_FEE,
   Networks,
   Transaction,
+  FeeBumpTransaction,
   Memo,
   Operation,
 } from "@stellar/stellar-sdk";
@@ -125,18 +126,23 @@ export function buildTransactionFromXDR(
   // Reconstruct the transaction from XDR
   const transaction = TransactionBuilder.fromXDR(xdrTx, networkPassphrase);
   
-  // Ensure we have a Transaction, not FeeBumpTransaction
-  if (transaction instanceof Transaction === false) {
-    throw new Error("Expected Transaction but got FeeBumpTransaction");
+  // Handle both Transaction and FeeBumpTransaction
+  let baseTransaction: Transaction;
+  if (transaction instanceof FeeBumpTransaction) {
+    baseTransaction = transaction.innerTransaction;
+  } else if (transaction instanceof Transaction) {
+    baseTransaction = transaction;
+  } else {
+    throw new Error("Expected Transaction or FeeBumpTransaction");
   }
   
   // Note: Fee and timeout are already set in the XDR by external SDKs
   // We only apply memo if provided and not already in the transaction
-  if (config.memo && !transaction.memo) {
-    transaction.memo = Memo.text(config.memo);
+  if (config.memo && !baseTransaction.memo) {
+    baseTransaction.memo = Memo.text(config.memo);
   }
 
-  return transaction;
+  return baseTransaction;
 
 }
 

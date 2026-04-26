@@ -245,7 +245,7 @@ export class AgentClient {
       contractAddress?: string;
     }) => {
       const startTime = Date.now();
-      const totalAmount = (parseFloat(params.desiredA) + parseFloat(params.desiredB)).toString();
+      const totalAmount = (Number(params.desiredA) + Number(params.desiredB)).toString();
       const metricId = this.metricsCollector.recordTransaction({
         type: 'deposit',
         status: 'pending',
