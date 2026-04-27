@@ -224,7 +224,16 @@ export class AgentClient {
         status: 'failed'
       });
 
-      throw error;
+      // Enhance error with swap context
+      const enhancedError = new Error(
+        `Swap operation failed on ${this.network} network. ` +
+        `Attempting to swap ${params.out} tokens (max ${params.inMax} input) ` +
+        `to address ${params.to} using contract ${params.contractAddress || 'default'}. ` +
+        `Original error: ${errorMessage}`
+      );
+      enhancedError.name = 'SwapError';
+      
+      throw enhancedError;
     }
   }
 
@@ -300,7 +309,20 @@ export class AgentClient {
         status: 'failed'
       });
 
-      throw error;
+      // Enhance error with optimized swap context
+      const sendAsset = 'type' in params.sendAsset ? 'XLM' : `${params.sendAsset.code}:${params.sendAsset.issuer}`;
+      const destAsset = 'type' in params.destAsset ? 'XLM' : `${params.destAsset.code}:${params.destAsset.issuer}`;
+      const amount = params.sendAmount || params.destAmount || 'unknown';
+      
+      const enhancedError = new Error(
+        `Optimized swap failed on ${this.network} network. ` +
+        `Strategy: ${params.strategy}, Amount: ${amount}, ` +
+        `Path: ${sendAsset} → ${destAsset}, Destination: ${destination}. ` +
+        `Original error: ${errorMessage}`
+      );
+      enhancedError.name = 'OptimizedSwapError';
+      
+      throw enhancedError;
     }
   }
 
@@ -371,7 +393,16 @@ export class AgentClient {
         status: 'failed'
       });
 
-      throw error;
+      // Enhance error with bridge context
+      const enhancedError = new Error(
+        `Token bridge failed on ${this.network} network. ` +
+        `Amount: ${params.amount} USDC, Target chain: ${targetChain}, ` +
+        `From address: ${this.publicKey}, To address: ${params.toAddress}. ` +
+        `Original error: ${errorMessage}`
+      );
+      enhancedError.name = 'TokenBridgeError';
+      
+      throw enhancedError;
     }
   }
 
@@ -429,7 +460,19 @@ export class AgentClient {
           status: 'failed'
         });
 
-        throw error;
+        // Enhance error with LP deposit context
+        const network = this.network;
+        const contract = params.contractAddress || 'default';
+        
+        const enhancedError = new Error(
+          `Liquidity deposit failed on ${network} network. ` +
+          `Contract: ${contract}, Caller: ${this.publicKey}, Recipient: ${params.to}. ` +
+          `Desired amounts: A=${params.desiredA}, B=${params.desiredB}, Minimum amounts: A=${params.minA}, B=${params.minB}. ` +
+          `Original error: ${errorMessage}`
+        );
+        enhancedError.name = 'LiquidityDepositError';
+        
+        throw enhancedError;
       }
     },
 
@@ -480,7 +523,19 @@ export class AgentClient {
           status: 'failed'
         });
 
-        throw error;
+        // Enhance error with LP withdrawal context
+        const network = this.network;
+        const contract = params.contractAddress || 'default';
+        
+        const enhancedError = new Error(
+          `Liquidity withdrawal failed on ${network} network. ` +
+          `Contract: ${contract}, Caller: ${this.publicKey}, Recipient: ${params.to}. ` +
+          `Share amount: ${params.shareAmount}, Minimum withdrawals: A=${params.minA}, B=${params.minB}. ` +
+          `Original error: ${errorMessage}`
+        );
+        enhancedError.name = 'LiquidityWithdrawalError';
+        
+        throw enhancedError;
       }
     },
 

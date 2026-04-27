@@ -196,7 +196,20 @@ import {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("Failed to deposit:", errorMessage);
-      throw error;
+      
+      // Enhance error with deposit-specific context
+      const network = config?.network || "unknown";
+      const contract = config?.contractAddress || "default";
+      
+      const enhancedError = new Error(
+        `Liquidity deposit failed on ${network} network. ` +
+        `Contract: ${contract}, Caller: ${caller}, Recipient: ${to}. ` +
+        `Desired amounts: A=${desiredA}, B=${desiredB}, Minimum amounts: A=${minA}, B=${minB}. ` +
+        `Original error: ${errorMessage}`
+      );
+      enhancedError.name = 'DepositError';
+      
+      throw enhancedError;
     }
   }
   
@@ -219,7 +232,21 @@ import {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("Failed to swap:", errorMessage);
-      throw error;
+      
+      // Enhance error with swap-specific context
+      const network = config?.network || "unknown";
+      const contract = config?.contractAddress || "default";
+      const swapType = buyA ? "buy token A" : "buy token B";
+      
+      const enhancedError = new Error(
+        `Contract swap failed on ${network} network. ` +
+        `Contract: ${contract}, Caller: ${caller}, Recipient: ${to}. ` +
+        `Operation: ${swapType}, Output amount: ${out}, Max input: ${inMax}. ` +
+        `Original error: ${errorMessage}`
+      );
+      enhancedError.name = 'ContractSwapError';
+      
+      throw enhancedError;
     }
   }
   
@@ -248,7 +275,20 @@ import {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("Failed to withdraw:", errorMessage);
-      throw error;
+      
+      // Enhance error with withdrawal-specific context
+      const network = config?.network || "unknown";
+      const contract = config?.contractAddress || "default";
+      
+      const enhancedError = new Error(
+        `Liquidity withdrawal failed on ${network} network. ` +
+        `Contract: ${contract}, Caller: ${caller}, Recipient: ${to}. ` +
+        `Share amount: ${shareAmount}, Minimum withdrawals: A=${minA}, B=${minB}. ` +
+        `Original error: ${errorMessage}`
+      );
+      enhancedError.name = 'WithdrawalError';
+      
+      throw enhancedError;
     }
   }
   

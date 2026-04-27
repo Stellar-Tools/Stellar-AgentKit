@@ -195,7 +195,16 @@ export async function quoteSwap(
   const response = await fetchImpl(buildPathEndpointUrl(client, params));
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch path quotes: ${response.status} ${response.statusText}`);
+    const sendAsset = 'type' in params.sendAsset ? 'XLM' : `${params.sendAsset.code}:${params.sendAsset.issuer}`;
+    const destAsset = 'type' in params.destAsset ? 'XLM' : `${params.destAsset.code}:${params.destAsset.issuer}`;
+    const amount = params.sendAmount || params.destAmount || 'unknown';
+    
+    throw new Error(
+      `Failed to fetch swap quotes from Horizon on ${client.network} network. ` +
+      `HTTP ${response.status} ${response.statusText}. ` +
+      `Path: ${sendAsset} → ${destAsset}, Amount: ${amount}, ` +
+      `Destination: ${destination}. Please check network connectivity and asset validity.`
+    );
   }
 
   const payload = (await response.json()) as HorizonPathResponse;
@@ -223,7 +232,15 @@ export async function swapBestRoute(
   const bestQuote = quotes[0];
 
   if (!bestQuote) {
-    throw new Error("No route available for the requested swap");
+    const sendAsset = 'type' in params.sendAsset ? 'XLM' : `${params.sendAsset.code}:${params.sendAsset.issuer}`;
+    const destAsset = 'type' in params.destAsset ? 'XLM' : `${params.destAsset.code}:${params.destAsset.issuer}`;
+    const amount = params.sendAmount || params.destAmount || 'unknown';
+    
+    throw new Error(
+      `No route available for swap on ${client.network} network. ` +
+      `Path: ${sendAsset} → ${destAsset}, Amount: ${amount}, ` +
+      `Destination: ${destination}. Please check liquidity pools or try different assets.`
+    );
   }
 
   const createServer =
@@ -260,15 +277,31 @@ export async function swapBestRoute(
     signedXdr,
     getNetworkPassphrase(client.network)
   );
-  const submission = await server.submitTransaction(signedTransaction);
-
-  return {
-    hash: submission.hash,
-    mode: params.mode,
-    sendAmount: params.mode === "strict-send" ? params.sendAmount! : bestQuote.sendAmount,
-    destAmount: params.mode === "strict-receive" ? params.destAmount! : bestQuote.destAmount,
-    path: bestQuote.path,
-  };
+  
+  try {
+    const submission = await server.submitTransaction(signedTransaction);
+    return {
+      hash: submission.hash,
+      mode: params.mode,
+      sendAmount: params.mode === "strict-send" ? params.sendAmount! : bestQuote.sendAmount,
+      destAmount: params.mode === "strict-receive" ? params.destAmount! : bestQuote.destAmount,
+      path: bestQuote.path,
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const sendAsset = 'type' in params.sendAsset ? 'XLM' : `${params.sendAsset.code}:${params.sendAsset.issuer}`;
+    const destAsset = 'type' in params.destAsset ? 'XLM' : `${params.destAsset.code}:${params.destAsset.issuer}`;
+    
+    const enhancedError = new Error(
+      `DEX swap execution failed on ${client.network} network. ` +
+      `Path: ${sendAsset} → ${destAsset}, Mode: ${params.mode}, ` +
+      `Destination: ${destination}, Hop count: ${bestQuote.hopCount}. ` +
+      `Original error: ${errorMessage}`
+    );
+    enhancedError.name = 'DexSwapError';
+    
+    throw enhancedError;
+  }
 }
 
 function buildPathEndpointUrl(
@@ -401,8 +434,11 @@ async function validateDestinationAssetSupport(
   );
 
   if (!response.ok) {
+    const assetInfo = `${destAsset.code}:${destAsset.issuer}`;
     throw new Error(
-      `Failed to load destination account for asset support validation: ${response.status} ${response.statusText}`
+      `Failed to validate destination asset support on ${client.network} network. ` +
+      `HTTP ${response.status} ${response.statusText} when fetching account ${destination}. ` +
+      `Asset: ${assetInfo}. Please check destination address and network connectivity.`
     );
   }
 
@@ -416,8 +452,11 @@ async function validateDestinationAssetSupport(
   });
 
   if (!supportsAsset) {
+    const assetInfo = `${destAsset.code}:${destAsset.issuer}`;
     throw new Error(
-      "Destination account does not trust the requested destination asset"
+      `Destination account ${destination} on ${client.network} network does not trust asset ${assetInfo}. ` +
+      `The recipient must establish a trustline for this asset before receiving it. ` +
+      `Asset details: Code=${destAsset.code}, Issuer=${destAsset.issuer}`
     );
   }
 }

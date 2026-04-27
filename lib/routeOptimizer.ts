@@ -112,20 +112,48 @@ export class RouteOptimizer {
    * Find the optimal route for a swap using the specified strategy
    */
   async findOptimalRoute(params: OptimizedSwapParams): Promise<RouteOption> {
-    const pools = await this.queryPools();
-    const routes = await this.calculateRoutes(params, pools);
-    
-    switch (params.strategy) {
-      case "best-route":
-        return this.selectBestRoute(routes);
-      case "direct":
-        return this.selectDirectRoute(routes);
-      case "split":
-        return this.selectSplitRoute(routes, params.splitRoutes ?? 3);
-      case "minimal-hops":
-        return this.selectMinimalHopsRoute(routes);
-      default:
-        throw new Error(`Unknown strategy: ${params.strategy}`);
+    try {
+      const pools = await this.queryPools();
+      const routes = await this.calculateRoutes(params, pools);
+      
+      switch (params.strategy) {
+        case "best-route":
+          return this.selectBestRoute(routes);
+        case "direct":
+          return this.selectDirectRoute(routes);
+        case "split":
+          return this.selectSplitRoute(routes, params.splitRoutes ?? 3);
+        case "minimal-hops":
+          return this.selectMinimalHopsRoute(routes);
+        default:
+          const sendAsset = 'type' in params.sendAsset ? 'XLM' : `${params.sendAsset.code}:${params.sendAsset.issuer}`;
+          const destAsset = 'type' in params.destAsset ? 'XLM' : `${params.destAsset.code}:${params.destAsset.issuer}`;
+          const amount = params.sendAmount || params.destAmount || 'unknown';
+          
+          throw new Error(
+            `Unknown swap strategy: ${params.strategy} on ${this.config.network} network. ` +
+            `Supported strategies: best-route, direct, split, minimal-hops. ` +
+            `Swap details: ${sendAsset} → ${destAsset}, Amount: ${amount}`
+          );
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'RouteOptimizerError') {
+        throw error;
+      }
+      
+      const sendAsset = 'type' in params.sendAsset ? 'XLM' : `${params.sendAsset.code}:${params.sendAsset.issuer}`;
+      const destAsset = 'type' in params.destAsset ? 'XLM' : `${params.destAsset.code}:${params.destAsset.issuer}`;
+      const amount = params.sendAmount || params.destAmount || 'unknown';
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      const enhancedError = new Error(
+        `Route optimization failed on ${this.config.network} network. ` +
+        `Strategy: ${params.strategy}, Path: ${sendAsset} → ${destAsset}, Amount: ${amount}. ` +
+        `Original error: ${errorMessage}`
+      );
+      enhancedError.name = 'RouteOptimizerError';
+      
+      throw enhancedError;
     }
   }
 
@@ -139,23 +167,40 @@ export class RouteOptimizer {
   ): Promise<OptimizedSwapResult> {
     const startTime = Date.now();
     
-    // Find optimal route
-    const route = await this.findOptimalRoute(params);
-    
-    // Execute the swap using the route
-    const swapResult = await this.executeSwapRoute(route, destination, signerPublicKey);
-    
-    const executionTime = Date.now() - startTime;
-    
-    return {
-      route,
-      transactionHash: swapResult.hash,
-      actualInput: swapResult.sendAmount,
-      actualOutput: swapResult.destAmount,
-      slippage: this.calculateSlippage(route, swapResult),
-      fees: route.totalFee,
-      executionTime
-    };
+    try {
+      const route = await this.findOptimalRoute(params);
+      const swapResult = await this.executeSwapRoute(route, destination, signerPublicKey);
+      
+      const executionTime = Date.now() - startTime;
+      
+      return {
+        route,
+        transactionHash: swapResult.hash,
+        actualInput: swapResult.sendAmount,
+        actualOutput: swapResult.destAmount,
+        slippage: this.calculateSlippage(route, swapResult),
+        fees: route.totalFee,
+        executionTime
+      };
+    } catch (error) {
+      if (error instanceof Error && (error.name === 'RouteOptimizerError' || error.name === 'SwapExecutionError')) {
+        throw error;
+      }
+      
+      const sendAsset = 'type' in params.sendAsset ? 'XLM' : `${params.sendAsset.code}:${params.sendAsset.issuer}`;
+      const destAsset = 'type' in params.destAsset ? 'XLM' : `${params.destAsset.code}:${params.destAsset.issuer}`;
+      const amount = params.sendAmount || params.destAmount || 'unknown';
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      const enhancedError = new Error(
+        `Optimized swap execution failed on ${this.config.network} network. ` +
+        `Strategy: ${params.strategy}, Path: ${sendAsset} → ${destAsset}, Amount: ${amount}, ` +
+        `Destination: ${destination}. Original error: ${errorMessage}`
+      );
+      enhancedError.name = 'OptimizedSwapExecutionError';
+      
+      throw enhancedError;
+    }
   }
 
   /**
@@ -370,7 +415,11 @@ export class RouteOptimizer {
    */
   private selectBestRoute(routes: RouteOption[]): RouteOption {
     if (routes.length === 0) {
-      throw new Error("No routes available for this swap");
+      throw new Error(
+        `No routes available for this swap on ${this.config.network} network. ` +
+        `This could be due to insufficient liquidity, unsupported asset pairs, or network connectivity issues. ` +
+        `Please check asset validity and available liquidity pools.`
+      );
     }
 
     // Sort by output amount (descending), then by confidence, then by hop count
@@ -410,7 +459,12 @@ export class RouteOptimizer {
    */
   private selectSplitRoute(routes: RouteOption[], splitCount: number): RouteOption {
     if (routes.length === 0) {
-      throw new Error("No routes available for this swap");
+      throw new Error(
+        `No routes available for split swap on ${this.config.network} network. ` +
+        `Split strategy requested with ${splitCount} routes but no viable routes found. ` +
+        `This could be due to insufficient liquidity, unsupported asset pairs, or network connectivity issues. ` +
+        `Consider using a different strategy or check asset validity.`
+      );
     }
 
     // For split strategy, we want to distribute the trade across multiple routes
@@ -481,13 +535,33 @@ export class RouteOptimizer {
         );
         return result;
       } catch (error) {
-        throw new Error(`Failed to execute swap: ${error instanceof Error ? error.message : String(error)}`);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const sendAsset = 'type' in route.path[0] ? 'XLM' : `${route.path[0].code}:${route.path[0].issuer}`;
+        const destAsset = 'type' in route.path[1] ? 'XLM' : `${route.path[1].code}:${route.path[1].issuer}`;
+        
+        const enhancedError = new Error(
+          `Failed to execute swap route on ${this.config.network} network. ` +
+          `Path: ${sendAsset} → ${destAsset}, Input amount: ${route.inputAmount}, ` +
+          `Hop count: ${route.hopCount}, Destination: ${destination}. ` +
+          `Original error: ${errorMessage}`
+        );
+        enhancedError.name = 'SwapExecutionError';
+        
+        throw enhancedError;
       }
     } else {
       // For multi-hop routes, we need to execute each hop sequentially
       // This is a complex implementation that would require atomic execution
       // For now, throw an error indicating multi-hop execution is not yet implemented
-      throw new Error("Multi-hop route execution is not yet implemented. Please use single-hop routes or implement multi-hop execution logic.");
+      const pathDescription = route.path.map(asset => 
+        'type' in asset ? 'XLM' : `${asset.code}:${asset.issuer}`
+      ).join(' → ');
+      
+      throw new Error(
+        `Multi-hop route execution is not yet implemented on ${this.config.network} network. ` +
+        `Requested path: ${pathDescription} (${route.hopCount} hops), Input amount: ${route.inputAmount}. ` +
+        `Please use single-hop routes or implement multi-hop execution logic.`
+      );
     }
   }
 
@@ -762,13 +836,15 @@ export class RouteOptimizer {
   }
 
   private assetEquals(asset1: StellarAssetInput, asset2: StellarAssetInput): boolean {
-    if (asset1.type === "native" && asset2.type === "native") return true;
-    if (asset1.type === "native" || asset2.type === "native") return false;
+    if ('type' in asset1 && 'type' in asset2 && asset1.type === "native" && asset2.type === "native") return true;
+    if ('type' in asset1 || 'type' in asset2) return false;
     return asset1.code === asset2.code && asset1.issuer === asset2.issuer;
   }
 
   private assetKey(asset: StellarAssetInput): string {
-    if (asset.type === "native") return "native";
-    return `${asset.code}:${asset.issuer}`;
+    if ('type' in asset && asset.type === "native") return "native";
+    // At this point, TypeScript knows asset is not native, so it has code and issuer
+    const nonNativeAsset = asset as { code: string; issuer: string };
+    return `${nonNativeAsset.code}:${nonNativeAsset.issuer}`;
   }
 }
