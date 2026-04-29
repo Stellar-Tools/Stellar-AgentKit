@@ -368,7 +368,7 @@ describe("dex helpers", () => {
         },
         { fetchImpl }
       )
-    ).rejects.toThrow("Destination account does not trust the requested destination asset");
+    ).rejects.toThrow("does not have a trustline for");
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });

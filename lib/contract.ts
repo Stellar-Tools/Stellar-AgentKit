@@ -208,6 +208,8 @@ import {
     inMax: string,
     config?: SorobanContractConfig
   ) {
+    const network = config?.network ?? "testnet";
+    const asset = buyA ? "asset A" : "asset B";
     try {
       const toScVal = addressToScVal(to);
       const buyAScVal = booleanToScVal(buyA);
@@ -217,9 +219,12 @@ import {
       if (config?.simulate) return result as any; // Forward the simulation text
       console.log(`Swapped successfully to ${to}`);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error("Failed to swap:", errorMessage);
-      throw error;
+      const cause = error instanceof Error ? error.message : String(error);
+      const message =
+        `Swap failed on ${network}: could not swap ${out} of ${asset} ` +
+        `(max input: ${inMax}) to ${to}. Cause: ${cause}`;
+      console.error(message);
+      throw new Error(message);
     }
   }
   
