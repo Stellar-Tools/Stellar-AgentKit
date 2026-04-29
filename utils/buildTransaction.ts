@@ -152,7 +152,7 @@ export function buildPathPaymentTransaction(
 
   if (operation.mode === "strict-send") {
     if (!operation.destMin) {
-      throw new Error("destMin is required for strict-send path payments");
+      throw new Error(`Missing required parameter: destMin is required for strict-send path payment swaps. Send amount: ${operation.sendAmount}, Send asset: ${operation.sendAsset.code || "native"}`);
     }
 
     builder.addOperation(
@@ -167,7 +167,7 @@ export function buildPathPaymentTransaction(
     );
   } else {
     if (!operation.sendMax) {
-      throw new Error("sendMax is required for strict-receive path payments");
+      throw new Error(`Missing required parameter: sendMax is required for strict-receive path payment swaps. Destination amount: ${operation.destAmount}, Destination asset: ${operation.destAsset.code || "native"}`);
     }
 
     builder.addOperation(

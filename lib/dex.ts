@@ -103,11 +103,11 @@ export function assetInputToSdkAsset(asset: StellarAssetInput): Asset {
   }
 
   if (!asset.code || !asset.issuer) {
-    throw new Error("Issued assets require both code and issuer");
+    throw new Error(`Invalid asset configuration: Issued assets require both code and issuer. Received: code=${asset.code}, issuer=${asset.issuer}`);
   }
 
   if (!StrKey.isValidEd25519PublicKey(asset.issuer)) {
-    throw new Error(`Invalid issuer public key: ${asset.issuer}`);
+    throw new Error(`Invalid asset issuer: ${asset.issuer} is not a valid Stellar public key for asset code ${asset.code}`);
   }
 
   return new Asset(asset.code, asset.issuer);
@@ -158,7 +158,7 @@ export function calculateSwapBounds(
   slippageBps: number = DEFAULT_SLIPPAGE_BPS
 ): { sendMax?: string; destMin?: string } {
   if (!Number.isInteger(slippageBps) || slippageBps < 0) {
-    throw new Error("slippageBps must be a non-negative integer");
+    throw new Error(`Invalid slippage tolerance: slippageBps must be a non-negative integer, received ${slippageBps}`);
   }
 
   const slippage = new Big(slippageBps).div(10000);
@@ -195,7 +195,7 @@ export async function quoteSwap(
   const response = await fetchImpl(buildPathEndpointUrl(client, params));
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch path quotes: ${response.status} ${response.statusText}`);
+    throw new Error(`Failed to fetch swap quotes from Horizon: HTTP ${response.status} ${response.statusText}. Network: ${client.network}, Horizon URL: ${client.horizonUrl}`);
   }
 
   const payload = (await response.json()) as HorizonPathResponse;
@@ -223,7 +223,10 @@ export async function swapBestRoute(
   const bestQuote = quotes[0];
 
   if (!bestQuote) {
-    throw new Error("No route available for the requested swap");
+    const sendAssetStr = assetInputToHorizonAsset(params.sendAsset);
+    const destAssetStr = assetInputToHorizonAsset(params.destAsset);
+    const amountStr = params.mode === "strict-send" ? params.sendAmount : params.destAmount;
+    throw new Error(`No swap route available: Cannot find path to swap ${amountStr} ${sendAssetStr} to ${params.mode === "strict-send" ? "any amount of " : ""}${destAssetStr} on ${client.network}. Try different amounts or assets.`);
   }
 
   const createServer =
@@ -320,7 +323,7 @@ function horizonAssetToInput(asset: HorizonAssetRecord): StellarAssetInput {
   }
 
   if (!asset.asset_code || !asset.asset_issuer) {
-    throw new Error("Horizon asset record is missing code or issuer");
+    throw new Error(`Invalid Horizon asset record: missing required fields code=${asset.asset_code}, issuer=${asset.asset_issuer}`);
   }
 
   return {
@@ -336,14 +339,28 @@ function validateDexClient(client: DexClientConfig) {
 function validateQuoteParams(params: QuoteSwapParams) {
   if (params.mode === "strict-send") {
     if (!params.sendAmount) {
-      throw new Error("sendAmount is required for strict-send quotes");
+      throw new Error("Missing required parameter: sendAmount is required for strict-send swap quotes");
+    }
+    if (parseFloat(params.sendAmount) <= 0) {
+      throw new Error(`Invalid send amount: ${params.sendAmount} must be greater than 0 for strict-send swaps`);
     }
   } else if (!params.destAmount) {
-    throw new Error("destAmount is required for strict-receive quotes");
+    throw new Error("Missing required parameter: destAmount is required for strict-receive swap quotes");
+  } else if (parseFloat(params.destAmount) <= 0) {
+    throw new Error(`Invalid destination amount: ${params.destAmount} must be greater than 0 for strict-receive swaps`);
   }
 
-  assetInputToSdkAsset(params.sendAsset);
-  assetInputToSdkAsset(params.destAsset);
+  try {
+    assetInputToSdkAsset(params.sendAsset);
+  } catch (error) {
+    throw new Error(`Invalid send asset: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  try {
+    assetInputToSdkAsset(params.destAsset);
+  } catch (error) {
+    throw new Error(`Invalid destination asset: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 function validateQuoteLimit(limit?: number) {
@@ -352,13 +369,13 @@ function validateQuoteLimit(limit?: number) {
   }
 
   if (!Number.isInteger(limit) || limit <= 0 || limit > INTERNAL_FETCH_LIMIT) {
-    throw new Error(`limit must be an integer between 1 and ${INTERNAL_FETCH_LIMIT}`);
+    throw new Error(`Invalid quote limit: ${limit} must be an integer between 1 and ${INTERNAL_FETCH_LIMIT}`);
   }
 }
 
 function validatePublicKey(value: string, label: string) {
   if (!value || !StrKey.isValidEd25519PublicKey(value)) {
-    throw new Error(`Invalid ${label} Stellar public key`);
+    throw new Error(`Invalid ${label} public key: ${value} is not a valid Stellar public key format`);
   }
 }
 
@@ -401,9 +418,7 @@ async function validateDestinationAssetSupport(
   );
 
   if (!response.ok) {
-    throw new Error(
-      `Failed to load destination account for asset support validation: ${response.status} ${response.statusText}`
-    );
+    throw new Error(`Failed to validate destination account ${destination} for asset support: HTTP ${response.status} ${response.statusText}. Asset: ${destAsset.code || "native"}:${destAsset.issuer || "native"}`);
   }
 
   const account = (await response.json()) as HorizonAccountResponse;
@@ -416,8 +431,6 @@ async function validateDestinationAssetSupport(
   });
 
   if (!supportsAsset) {
-    throw new Error(
-      "Destination account does not trust the requested destination asset"
-    );
+    throw new Error(`Destination account ${destination} does not trust asset ${destAsset.code}:${destAsset.issuer}. The account must establish a trustline before receiving this asset.`);
   }
 }

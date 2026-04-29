@@ -25,7 +25,7 @@ import {
   const addressToScVal = (address: string) => {
     // Validate address format
     if (!address.match(/^[CG][A-Z0-9]{55}$/)) {
-      throw new Error(`Invalid address format: ${address}`);
+      throw new Error(`Invalid Stellar contract address format: ${address}. Expected format: 'C' or 'G' followed by 56 alphanumeric characters`);
     }
     return nativeToScVal(new Address(address), { type: "address" });
   };
@@ -48,12 +48,12 @@ import {
     try {
       const server = new rpc.Server(config.rpcUrl, { allowHttp: true });
       const sourceAccount = await server.getAccount(caller).catch((err) => {
-        throw new Error(`Failed to fetch account ${caller}: ${err.message}`);
+        throw new Error(`Failed to fetch account ${caller} from Soroban RPC: ${err.message}. Network: ${config.network}, RPC URL: ${config.rpcUrl}`);
       });
   
       const targetContractId = config.contractAddress || (config.network === "testnet" ? DEFAULT_TESTNET_CONTRACT : "");
       if (!targetContractId) {
-        throw new Error("A specific contractAddress must be provided for Soroban LP/Swap operations on mainnet.");
+        throw new Error(`No contract address provided for ${config.network}. A specific contractAddress must be provided for Soroban swap operations on mainnet.`);
       }
 
       const contract = new Contract(targetContractId);
@@ -70,7 +70,7 @@ import {
       if (config.simulate) {
         const simulation = await server.simulateTransaction(transaction) as any;
         if (simulation.error) {
-          throw new Error(`Simulation Failed: ${simulation.error}`);
+          throw new Error(`Swap simulation failed: ${simulation.error}. Contract: ${targetContractId}, Function: ${functName}, Network: ${config.network}`);
         }
         
         let returnValue = null;
@@ -93,7 +93,7 @@ import {
 
       // Prepare and sign transaction
       const preparedTx = await server.prepareTransaction(transaction).catch((err) => {
-        throw new Error(`Failed to prepare transaction: ${err.message}`);
+        throw new Error(`Failed to prepare swap transaction for ${functName}: ${err.message}. Contract: ${targetContractId}, Network: ${config.network}`);
       });
       const prepareTxXDR = preparedTx.toXDR();
       
@@ -102,7 +102,7 @@ import {
         const passphrase = config.network === "mainnet" ? Networks.PUBLIC : Networks.TESTNET;
         signedTxResponse = signTransaction(prepareTxXDR, passphrase);
       } catch (err: any) {
-        throw new Error(`Failed to sign transaction: ${err.message}`);
+        throw new Error(`Failed to sign swap transaction for ${functName}: ${err.message}. Network: ${config.network}`);
       }
   
       // Handle both string and object response from signTransaction
@@ -111,8 +111,8 @@ import {
       const passphrase = config.network === "mainnet" ? Networks.PUBLIC : Networks.TESTNET;
       const tx = TransactionBuilder.fromXDR(signedXDR, passphrase);
       const txResult = await server.sendTransaction(tx).catch((err) => {
-        console.error(`Send transaction failed for ${functName}: ${err.message}`);
-        throw new Error(`Send transaction failed: ${err.message}`);
+        console.error(`Send swap transaction failed for ${functName}: ${err.message}`);
+        throw new Error(`Failed to submit swap transaction to Soroban: ${err.message}. Contract: ${targetContractId}, Network: ${config.network}`);
       });
   
       let txResponse = await server.getTransaction(txResult.hash);
@@ -130,8 +130,8 @@ import {
       }
   
       if (txResponse.status !== "SUCCESS") {
-        console.error(`Transaction failed for ${functName} with status: ${txResponse.status}`, JSON.stringify(txResponse, null, 2));
-        throw new Error(`Transaction failed with status: ${txResponse.status}`);
+        console.error(`Swap transaction failed for ${functName} with status: ${txResponse.status}`, JSON.stringify(txResponse, null, 2));
+        throw new Error(`Swap transaction failed with status: ${txResponse.status}. Hash: ${txResult.hash}, Contract: ${targetContractId}, Network: ${config.network}`);
       }
   
       // Parse return value if present (e.g., for withdraw)
@@ -142,8 +142,8 @@ import {
           console.log(`Parsed transaction result for ${functName}:`, parsedValue);
           return parsedValue; // Returns array for withdraw
         } catch (err) {
-          console.error(`Failed to parse transaction return value for ${functName}:`, err);
-          throw new Error(`Failed to parse transaction result: ${err instanceof Error ? err.message : String(err)}`);
+          console.error(`Failed to parse swap transaction result for ${functName}:`, err);
+          throw new Error(`Failed to parse swap transaction result: ${err instanceof Error ? err.message : String(err)}. Function: ${functName}, Contract: ${targetContractId}`);
         }
       }
   
@@ -209,16 +209,27 @@ import {
     config?: SorobanContractConfig
   ) {
     try {
+      // Validate parameters before processing
+      if (!out || parseFloat(out) <= 0) {
+        throw new Error(`Invalid output amount: ${out} must be greater than 0 for swap operations`);
+      }
+      if (!inMax || parseFloat(inMax) <= 0) {
+        throw new Error(`Invalid maximum input amount: ${inMax} must be greater than 0 for swap operations`);
+      }
+      if (parseFloat(inMax) < parseFloat(out)) {
+        throw new Error(`Invalid swap parameters: maximum input ${inMax} cannot be less than output ${out}`);
+      }
+
       const toScVal = addressToScVal(to);
       const buyAScVal = booleanToScVal(buyA);
       const outScVal = numberToI128(out);
       const inMaxScVal = numberToI128(inMax);
       const result = await contractInt(caller, "swap", [toScVal, buyAScVal, outScVal, inMaxScVal], config);
       if (config?.simulate) return result as any; // Forward the simulation text
-      console.log(`Swapped successfully to ${to}`);
+      console.log(`Swapped successfully: ${out} tokens to ${to}`);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error("Failed to swap:", errorMessage);
+      console.error(`Swap operation failed:`, errorMessage);
       throw error;
     }
   }
