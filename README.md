@@ -766,7 +766,7 @@ AgentKit includes a comprehensive logging system designed for debugging, monitor
 
 ```typescript
 
-import { createLogger, Logger } from "./utils/logger";
+import { createLogger, Logger } from "stellar-agentkit";
 
 
 

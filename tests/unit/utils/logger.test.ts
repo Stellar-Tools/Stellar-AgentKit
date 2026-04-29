@@ -118,13 +118,13 @@ describe('Logger System', () => {
       expect(mockConsole.info).toHaveBeenCalledWith(
         expect.stringContaining('[INFO] [TestModule]'),
         'Test message',
-        expect.objectContaining({
+        {
           publicKey: 'GABC123...', // Public keys should not be sanitized
-          privateKey: '[REDACTED]',
+          privateKey: '[REDACTED]', // Now properly sanitized due to security fix
           secret: '[REDACTED]',
           password: '[REDACTED]',
           normalField: 'visible'
-        })
+        }
       );
     });
 
@@ -161,16 +161,16 @@ describe('Logger System', () => {
       expect(mockConsole.info).toHaveBeenCalledWith(
         expect.stringContaining('[INFO] [TestModule]'),
         'Test message',
-        expect.objectContaining({
-          user: expect.objectContaining({
+        {
+          user: {
             name: 'John',
-            privateKey: '[REDACTED]',
-            profile: expect.objectContaining({
+            privateKey: '[REDACTED]', // Now properly sanitized due to security fix
+            profile: {
               secret: '[REDACTED]',
               public: 'visible'
-            })
-          })
-        })
+            }
+          }
+        }
       );
     });
   });

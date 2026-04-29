@@ -97,13 +97,13 @@ export class Logger {
 
     const sensitiveKeys = [
       'secret',
-      'privateKey',
+      'privatekey',
       'private_key',
       'password',
       'seed',
       'mnemonic',
       'signature',
-      'apiKey',
+      'apikey',
       'api_key',
     ];
 
@@ -112,7 +112,7 @@ export class Logger {
     for (const key in sanitized) {
       const lowerKey = key.toLowerCase();
       
-      if (sensitiveKeys.some(sensitive => lowerKey === sensitive || lowerKey.endsWith(sensitive))) {
+      if (sensitiveKeys.some(sensitive => lowerKey.includes(sensitive))) {
         sanitized[key] = '[REDACTED]';
       } else if (typeof sanitized[key] === 'object' && sanitized[key] !== null) {
         sanitized[key] = this.sanitizeData(sanitized[key]);
@@ -226,6 +226,8 @@ export class Logger {
     network: 'testnet' | 'mainnet',
     metadata?: Record<string, any>
   ): void {
+    if (!this.shouldLog('info')) return;
+    
     const entry = this.createLogEntry(
       'info',
       `Transaction: ${operation}`,
