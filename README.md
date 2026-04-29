@@ -390,3 +390,8 @@ Contributions are welcome! Please read our contributing guidelines before submit
 ## 📞 Support
 
 For issues or questions, please open an issue on GitHub.  
+## Improvements by Rahul
+
+- Improved documentation for beginners
+- Added clearer setup instructions
+- Enhanced readability
