@@ -97,13 +97,13 @@ export class Logger {
 
     const sensitiveKeys = [
       'secret',
-      'privatekey',
+      'privateKey',
       'private_key',
       'password',
       'seed',
       'mnemonic',
       'signature',
-      'apikey',
+      'apiKey',
       'api_key',
     ];
 
@@ -112,7 +112,7 @@ export class Logger {
     for (const key in sanitized) {
       const lowerKey = key.toLowerCase();
       
-      if (sensitiveKeys.some(sensitive => lowerKey.includes(sensitive))) {
+      if (sensitiveKeys.some(sensitive => lowerKey === sensitive || lowerKey.endsWith(sensitive))) {
         sanitized[key] = '[REDACTED]';
       } else if (typeof sanitized[key] === 'object' && sanitized[key] !== null) {
         sanitized[key] = this.sanitizeData(sanitized[key]);

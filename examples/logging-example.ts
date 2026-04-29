@@ -132,8 +132,8 @@ async function demonstrateLogging() {
   securityLogger.info('User authentication', {
     username: 'john_doe',
     publicKey: 'GABC123DEF456...', // Public keys are shown
-    privateKey: 'SAMPLE_PRIVATE_KEY...',  // Private keys are redacted
-    password: 'sample_secret',       // Passwords are redacted
+    privateKey: 'SSECRET123...',  // Private keys are redacted
+    password: 'secret123',       // Passwords are redacted
     apiKey: 'key_abc123',        // API keys are redacted
     normalField: 'visible',      // Normal fields are shown
   });
