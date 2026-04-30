@@ -195,7 +195,16 @@ export async function quoteSwap(
   const response = await fetchImpl(buildPathEndpointUrl(client, params));
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch path quotes: ${response.status} ${response.statusText}`);
+    const sendAssetLabel = assetInputToHorizonAsset(params.sendAsset);
+    const destAssetLabel = assetInputToHorizonAsset(params.destAsset);
+    const amountLabel = params.mode === "strict-send"
+      ? `sendAmount=${params.sendAmount}`
+      : `destAmount=${params.destAmount}`;
+    throw new Error(
+      `Failed to fetch path quotes for ${params.mode} swap ` +
+      `(${sendAssetLabel} → ${destAssetLabel}, ${amountLabel}) ` +
+      `on ${client.network}: ${response.status} ${response.statusText}`
+    );
   }
 
   const payload = (await response.json()) as HorizonPathResponse;
@@ -223,7 +232,16 @@ export async function swapBestRoute(
   const bestQuote = quotes[0];
 
   if (!bestQuote) {
-    throw new Error("No route available for the requested swap");
+    const sendAssetLabel = assetInputToHorizonAsset(params.sendAsset);
+    const destAssetLabel = assetInputToHorizonAsset(params.destAsset);
+    const amountLabel = params.mode === "strict-send"
+      ? `sendAmount=${params.sendAmount}`
+      : `destAmount=${params.destAmount}`;
+    throw new Error(
+      `No route available for ${params.mode} swap ` +
+      `(${sendAssetLabel} → ${destAssetLabel}, ${amountLabel}) ` +
+      `on ${client.network}`
+    );
   }
 
   const createServer =
@@ -417,7 +435,8 @@ async function validateDestinationAssetSupport(
 
   if (!supportsAsset) {
     throw new Error(
-      "Destination account does not trust the requested destination asset"
+      `Destination account ${destination} does not trust asset ${destAsset.code}:${destAsset.issuer}. ` +
+      `The destination account must have a trustline for this asset before receiving it.`
     );
   }
 }

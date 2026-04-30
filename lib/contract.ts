@@ -131,7 +131,10 @@ import {
   
       if (txResponse.status !== "SUCCESS") {
         console.error(`Transaction failed for ${functName} with status: ${txResponse.status}`, JSON.stringify(txResponse, null, 2));
-        throw new Error(`Transaction failed with status: ${txResponse.status}`);
+        throw new Error(
+          `Transaction failed with status: ${txResponse.status} ` +
+          `(function: ${functName}, contract: ${targetContractId}, network: ${config.network})`
+        );
       }
   
       // Parse return value if present (e.g., for withdraw)
@@ -219,7 +222,10 @@ import {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("Failed to swap:", errorMessage);
-      throw error;
+      throw new Error(
+        `Failed to swap (to=${to}, buyA=${buyA}, out=${out}, inMax=${inMax}, ` +
+        `network=${config?.network ?? "testnet"}): ${errorMessage}`
+      );
     }
   }
   
