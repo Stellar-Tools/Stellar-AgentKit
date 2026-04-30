@@ -41,6 +41,9 @@
     "copyfiles": "^2.4.1",
     "vitest": "^4.0.18"
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "directories": {
     "lib": "lib"
   },
