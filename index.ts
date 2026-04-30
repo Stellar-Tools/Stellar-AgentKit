@@ -2,7 +2,7 @@ import { bridgeTokenTool } from "./tools/bridge";
 import { StellarLiquidityContractTool } from "./tools/contract";
 import { StellarDexTool } from "./tools/dex";
 import { StellarContractTool } from "./tools/stake";
-import { stellarSendPaymentTool } from "./tools/stellar";
+import { stellarSendPaymentTool, stellarGetBalanceTool, stellarGetAccountInfoTool } from "./tools/stellar";
 import { StellarClaimBalanceTool } from "./tools/claim_balance_tool";
 import { StellarAccountTool } from "./tools/account";
 import { StellarAssetTool } from "./tools/asset";
@@ -59,6 +59,8 @@ export const stellarTools = [
   StellarLiquidityContractTool,
   StellarContractTool,
   stellarSendPaymentTool,
+  stellarGetBalanceTool,
+  stellarGetAccountInfoTool,
   StellarClaimBalanceTool,
   StellarAccountTool,
   StellarAssetTool,
