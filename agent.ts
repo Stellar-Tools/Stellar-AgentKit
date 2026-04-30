@@ -14,6 +14,26 @@ import {
   type SwapBestRouteParams,
   type SwapBestRouteResult,
 } from "./lib/dex";
+import {
+  getAccountInfo,
+  getBalances,
+  getTransactionHistory,
+  getOperationHistory,
+  fundTestnetAccount,
+  type AccountInfo,
+  type AccountBalance,
+  type TransactionRecord,
+  type OperationRecord,
+} from "./lib/account";
+import {
+  getAssetDetails,
+  getOrderbook,
+  getTrades,
+  type AssetDetails,
+  type OrderbookSummary,
+  type TradeRecord,
+  type StellarAssetInput as AssetStellarAssetInput,
+} from "./lib/asset";
 import { bridgeTokenTool } from "./tools/bridge";
 import {
   Horizon,
@@ -66,6 +86,13 @@ export type {
   RouteQuote,
   SwapBestRouteParams,
   SwapBestRouteResult,
+  AccountInfo,
+  AccountBalance,
+  TransactionRecord,
+  OperationRecord,
+  AssetDetails,
+  OrderbookSummary,
+  TradeRecord,
 };
 
 export class AgentClient {
@@ -235,6 +262,165 @@ export class AgentClient {
         },
         params
       );
+    },
+  };
+
+  /**
+   * Account explorer – read-only access to Stellar account data.
+   *
+   * These methods query the Horizon API and do NOT require a private key.
+   * They work on both testnet and mainnet.
+   */
+  public account = {
+    /**
+     * Get comprehensive account information: balances, signers, thresholds, flags.
+     *
+     * @param publicKey - The Stellar G-address to query (defaults to configured publicKey)
+     */
+    getInfo: async (publicKey?: string): Promise<AccountInfo> => {
+      const key = publicKey ?? this.publicKey;
+      if (!key) throw new Error("No public key provided or configured");
+      return await getAccountInfo(key, {
+        network: this.network,
+        horizonUrl: this.rpcUrl,
+      });
+    },
+
+    /**
+     * Get account balance summary.
+     *
+     * @param publicKey - The Stellar G-address to query (defaults to configured publicKey)
+     */
+    getBalances: async (publicKey?: string): Promise<AccountBalance[]> => {
+      const key = publicKey ?? this.publicKey;
+      if (!key) throw new Error("No public key provided or configured");
+      return await getBalances(key, {
+        network: this.network,
+        horizonUrl: this.rpcUrl,
+      });
+    },
+
+    /**
+     * Get recent transaction history.
+     *
+     * @param publicKey - The Stellar G-address (defaults to configured publicKey)
+     * @param limit     - Max transactions to return (1–50, default 10)
+     * @param order     - 'desc' (newest first) or 'asc' (oldest first)
+     */
+    getTransactions: async (
+      publicKey?: string,
+      limit: number = 10,
+      order: "asc" | "desc" = "desc"
+    ): Promise<TransactionRecord[]> => {
+      const key = publicKey ?? this.publicKey;
+      if (!key) throw new Error("No public key provided or configured");
+      return await getTransactionHistory(key, {
+        network: this.network,
+        horizonUrl: this.rpcUrl,
+      }, limit, order);
+    },
+
+    /**
+     * Get recent operation history.
+     *
+     * @param publicKey - The Stellar G-address (defaults to configured publicKey)
+     * @param limit     - Max operations to return (1–50, default 10)
+     * @param order     - 'desc' (newest first) or 'asc' (oldest first)
+     */
+    getOperations: async (
+      publicKey?: string,
+      limit: number = 10,
+      order: "asc" | "desc" = "desc"
+    ): Promise<OperationRecord[]> => {
+      const key = publicKey ?? this.publicKey;
+      if (!key) throw new Error("No public key provided or configured");
+      return await getOperationHistory(key, {
+        network: this.network,
+        horizonUrl: this.rpcUrl,
+      }, limit, order);
+    },
+
+    /**
+     * Fund a testnet account using Stellar Friendbot.
+     * Only works on testnet. Creates and funds the account with 10,000 test XLM.
+     *
+     * @param publicKey - The Stellar G-address to fund (defaults to configured publicKey)
+     */
+    fundTestnet: async (
+      publicKey?: string
+    ): Promise<{ success: boolean; message: string }> => {
+      if (this.network !== "testnet") {
+        throw new Error(
+          "Friendbot funding is only available on testnet. " +
+          "Initialize AgentClient with network: 'testnet' to use this method."
+        );
+      }
+      const key = publicKey ?? this.publicKey;
+      if (!key) throw new Error("No public key provided or configured");
+      return await fundTestnetAccount(key);
+    },
+  };
+
+  /**
+   * Asset & market data explorer – read-only access to Stellar asset information.
+   *
+   * These methods query the Horizon API and do NOT require a private key.
+   * They work on both testnet and mainnet.
+   */
+  public asset = {
+    /**
+     * Look up details about a Stellar asset.
+     * Returns metadata including trust count, circulating supply, and issuer flags.
+     *
+     * @param assetCode   - The asset code (e.g. "USDC")
+     * @param assetIssuer - The issuer's public key
+     */
+    getDetails: async (
+      assetCode: string,
+      assetIssuer: string
+    ): Promise<AssetDetails[]> => {
+      return await getAssetDetails(assetCode, assetIssuer, {
+        network: this.network,
+        horizonUrl: this.rpcUrl,
+      });
+    },
+
+    /**
+     * Fetch the current SDEX orderbook for a trading pair.
+     *
+     * @param baseAsset    - The base asset (e.g. { type: "native" } or { code: "USDC", issuer: "G..." })
+     * @param counterAsset - The counter asset
+     * @param limit        - Number of entries per side (1–200, default 10)
+     */
+    getOrderbook: async (
+      baseAsset: AssetStellarAssetInput,
+      counterAsset: AssetStellarAssetInput,
+      limit: number = 10
+    ): Promise<OrderbookSummary> => {
+      return await getOrderbook(baseAsset, counterAsset, {
+        network: this.network,
+        horizonUrl: this.rpcUrl,
+      }, limit);
+    },
+
+    /**
+     * Fetch recent trades for a trading pair on the SDEX.
+     *
+     * @param baseAsset    - The base asset
+     * @param counterAsset - The counter asset
+     * @param limit        - Max trades to return (1–50, default 10)
+     * @param order        - 'desc' (newest first) or 'asc' (oldest first)
+     */
+    getTrades: async (
+      baseAsset: AssetStellarAssetInput,
+      counterAsset: AssetStellarAssetInput,
+      limit: number = 10,
+      order: "asc" | "desc" = "desc"
+    ): Promise<TradeRecord[]> => {
+      return await getTrades(baseAsset, counterAsset, {
+        network: this.network,
+        horizonUrl: this.rpcUrl,
+      }, limit, order);
     },
   };
 

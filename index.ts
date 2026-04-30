@@ -4,6 +4,8 @@ import { StellarDexTool } from "./tools/dex";
 import { StellarContractTool } from "./tools/stake";
 import { stellarSendPaymentTool } from "./tools/stellar";
 import { StellarClaimBalanceTool } from "./tools/claim_balance_tool";
+import { StellarAccountTool } from "./tools/account";
+import { StellarAssetTool } from "./tools/asset";
 
 // Agent exportları (Hem sınıfları hem de tipleri içerecek şekilde)
 export {
@@ -19,10 +21,36 @@ export type {
   RouteQuote,
   SwapBestRouteParams,
   SwapBestRouteResult,
+  AccountInfo,
+  AccountBalance,
+  TransactionRecord,
+  OperationRecord,
+  AssetDetails,
+  OrderbookSummary,
+  TradeRecord,
 } from "./agent";
 
 // claim_balance_tool içindeki her şeyi export et
 export * from "./tools/claim_balance_tool";
+
+// Account & Asset tool exportları
+export { StellarAccountTool } from "./tools/account";
+export { StellarAssetTool } from "./tools/asset";
+
+// Lib-level exports for direct usage
+export {
+  getAccountInfo,
+  getBalances,
+  getTransactionHistory,
+  getOperationHistory,
+  fundTestnetAccount,
+} from "./lib/account";
+
+export {
+  getAssetDetails,
+  getOrderbook,
+  getTrades,
+} from "./lib/asset";
 
 // Bütün tool'ların listesi
 export const stellarTools = [
@@ -32,4 +60,6 @@ export const stellarTools = [
   StellarContractTool,
   stellarSendPaymentTool,
   StellarClaimBalanceTool,
+  StellarAccountTool,
+  StellarAssetTool,
 ];
