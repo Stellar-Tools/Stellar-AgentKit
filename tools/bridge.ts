@@ -15,14 +15,15 @@ import {
 } from "@stellar/stellar-sdk";
 import { ensure } from "../utils/utils";
 import { buildTransactionFromXDR } from "../utils/buildTransaction";
+import { SecureKeyManager } from "../lib/keyManager";
 import * as dotenv from "dotenv";
 import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
 
 dotenv.config({ path: ".env" });
 
-const fromAddress = process.env.STELLAR_PUBLIC_KEY as string;
-const privateKey = process.env.STELLAR_PRIVATE_KEY as string;
+// 🔒 SECURITY: Use secure key manager instead of direct env access
+const keyManager = SecureKeyManager.getInstance();
 
 type StellarNetwork = "stellar-testnet" | "stellar-mainnet";
 
@@ -78,13 +79,49 @@ export const bridgeTokenTool = new DynamicStructuredTool({
     fromNetwork: StellarNetwork;
     targetChain: TargetChain;
   }) => {
-    // Mainnet safeguard - additional layer beyond AgentClient
+    // 🔒 SECURITY: Enhanced mainnet safeguard with secure key validation
     if (
       fromNetwork === "stellar-mainnet" &&
       process.env.ALLOW_MAINNET_BRIDGE !== "true"
     ) {
       throw new Error(
-        "Mainnet bridging is disabled. Set ALLOW_MAINNET_BRIDGE=true in your .env file to enable."
+        "🔒 Mainnet bridging is disabled for security.\n" +
+        "Set ALLOW_MAINNET_BRIDGE=true in your .env file to enable.\n" +
+        "⚠️  WARNING: Mainnet operations use real funds and are irreversible."
+      );
+    }
+
+    // 🔒 SECURITY: Validate destination address format
+    if (!toAddress || !/^0x[a-fA-F0-9]{40}$/.test(toAddress)) {
+      throw new Error(
+        "🔒 Invalid destination address format.\n" +
+        "EVM addresses must be 42 characters starting with '0x'."
+      );
+    }
+
+    // 🔒 SECURITY: Validate amount format and range
+    const amountBig = new Big(amount);
+    if (amountBig.lte(0)) {
+      throw new Error("🔒 Bridge amount must be greater than 0");
+    }
+    if (amountBig.gt("1000000")) { // 1M USDC limit for safety
+      throw new Error(
+        "🔒 Bridge amount exceeds safety limit of 1,000,000 USDC.\n" +
+        "For larger amounts, please contact support or use multiple transactions."
+      );
+    }
+
+    // 🔒 SECURITY: Get keypair and address securely
+    let srbKeypair: Keypair;
+    let fromAddress: string;
+    
+    try {
+      srbKeypair = keyManager.getSecureKeypair();
+      fromAddress = srbKeypair.publicKey();
+    } catch (error) {
+      throw new Error(
+        "🔒 Failed to access Stellar credentials securely.\n" +
+        "Please ensure STELLAR_PRIVATE_KEY is set correctly in your .env file."
       );
     }
 
@@ -125,7 +162,6 @@ export const bridgeTokenTool = new DynamicStructuredTool({
 
     const xdrTx = (await sdk.bridge.rawTxBuilder.send(sendParams)) as string;
 
-    const srbKeypair = Keypair.fromSecret(privateKey);
     const transaction = buildTransactionFromXDR(
       "bridge",
       xdrTx,
@@ -218,13 +254,12 @@ export const bridgeTokenTool = new DynamicStructuredTool({
         tokenAddress: destinationTokenSBR.tokenAddress,
       });
 
-      const keypair = StellarKeypair.fromSecret(privateKey);
       const trustTx = buildTransactionFromXDR(
         "bridge",
         xdrTx,
         STELLAR_NETWORK_CONFIG[fromNetwork].networkPassphrase
       );
-      trustTx.sign(keypair);
+      trustTx.sign(srbKeypair);
       const signedTrustLineTx = trustTx.toXDR();
 
       const submit = await sdk.utils.srb.submitTransactionStellar(

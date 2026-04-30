@@ -1,30 +1,35 @@
 import { Keypair, TransactionBuilder } from "@stellar/stellar-sdk";
+import { getSecureSigningKeypair, signTransactionSecurely } from "./keyManager";
 
+/**
+ * Get a signing keypair with enhanced security features
+ * 
+ * 🔒 SECURITY: Now uses SecureKeyManager for enhanced protection
+ * - Validates key format before processing
+ * - Uses constant-time comparison for public key validation
+ * - Automatic memory cleanup and key rotation
+ * 
+ * @param expectedPublicKey Optional public key for validation
+ * @returns Stellar keypair with security enhancements
+ */
 export function getSigningKeypair(expectedPublicKey?: string): Keypair {
-  const secret = process.env.STELLAR_PRIVATE_KEY;
-
-  if (!secret) {
-    throw new Error("Missing STELLAR_PRIVATE_KEY");
-  }
-
-  const keypair = Keypair.fromSecret(secret);
-
-  if (expectedPublicKey && keypair.publicKey() !== expectedPublicKey) {
-    throw new Error(
-      "STELLAR_PRIVATE_KEY does not match the configured source public key"
-    );
-  }
-
-  return keypair;
+  return getSecureSigningKeypair(expectedPublicKey);
 }
 
+/**
+ * Sign a transaction with enhanced security
+ * 
+ * 🔒 SECURITY: Uses secure key management and automatic cleanup
+ * 
+ * @param txXDR Transaction XDR to sign
+ * @param networkPassphrase Network passphrase
+ * @param expectedPublicKey Optional public key validation
+ * @returns Signed transaction XDR
+ */
 export const signTransaction = (
   txXDR: string,
   networkPassphrase: string,
   expectedPublicKey?: string
-) => {
-  const keypair = getSigningKeypair(expectedPublicKey);
-  const transaction = TransactionBuilder.fromXDR(txXDR, networkPassphrase);
-  transaction.sign(keypair);
-  return transaction.toXDR();
+): string => {
+  return signTransactionSecurely(txXDR, networkPassphrase, expectedPublicKey);
 };
