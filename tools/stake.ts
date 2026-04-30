@@ -1,3 +1,17 @@
+import { DynamicStructuredTool } from "@langchain/core/tools";
+import { z } from "zod";
+import {
+  initialize,
+  stake,
+  unstake,
+  claimRewards,
+  getStake,
+} from "../lib/stakeF";
+
+const STELLAR_PUBLIC_KEY = process.env.STELLAR_PUBLIC_KEY || "";
+const STELLAR_NETWORK = (process.env.STELLAR_NETWORK?.toLowerCase() || "testnet") as "testnet" | "mainnet";
+const SOROBAN_RPC_URL = process.env.SOROBAN_RPC_URL || "https://soroban-testnet.stellar.org";
+
 export const StellarContractTool = new DynamicStructuredTool({
   name: "stellar_contract_tool",
   description: "Interact with a staking contract on Stellar Soroban: initialize, stake, unstake, claim rewards, or get stake.",

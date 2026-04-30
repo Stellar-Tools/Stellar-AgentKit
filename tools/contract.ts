@@ -1,3 +1,16 @@
+import { DynamicStructuredTool } from "@langchain/core/tools";
+import { z } from "zod";
+import {
+  getShareId,
+  deposit,
+  withdraw,
+  getReserves,
+} from "../lib/contract";
+
+const STELLAR_PUBLIC_KEY = process.env.STELLAR_PUBLIC_KEY || "";
+const STELLAR_NETWORK = (process.env.STELLAR_NETWORK?.toLowerCase() || "testnet") as "testnet" | "mainnet";
+const SOROBAN_RPC_URL = process.env.SOROBAN_RPC_URL || "https://soroban-testnet.stellar.org";
+
 export const StellarLiquidityContractTool = new DynamicStructuredTool({
   name: "stellar_liquidity_contract_tool",
   description: "Interact with a liquidity contract on Stellar Soroban: getShareId, deposit, swap, withdraw, getReserves.",
@@ -52,8 +65,21 @@ export const StellarLiquidityContractTool = new DynamicStructuredTool({
           if (!to || buyA === undefined || !out || !inMax) {
             throw new Error("to, buyA, out, and inMax are required for swap");
           }
-          // Diğer case'ler buraya devam edecek...
-          return "Swap executed (Logic needs to be completed based on your lib)";
+          // Note: Full swap logic should be implemented in lib/contract if needed.
+          return "Swap functionality is currently a placeholder in this tool.";
+        }
+        case "withdraw": {
+          if (!to || !shareAmount || !minA || !minB) {
+            throw new Error("to, shareAmount, minA, and minB are required for withdraw");
+          }
+          const result = await withdraw(STELLAR_PUBLIC_KEY, to, shareAmount, minA, minB, config);
+          return result ?? `Withdrawn successfully to ${to}.`;
+        }
+        case "get_reserves": {
+          const result = await getReserves(STELLAR_PUBLIC_KEY, config);
+          return result
+            ? `Reserves: ${JSON.stringify(result)}`
+            : "No reserves found.";
         }
         default:
           throw new Error("Unsupported action");

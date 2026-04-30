@@ -141,8 +141,8 @@ export async function getAccountInfo(
       const base: AccountBalance = {
         assetType: b.asset_type,
         balance: b.balance,
-        buyingLiabilities: b.buying_liabilities,
-        sellingLiabilities: b.selling_liabilities,
+        buyingLiabilities: (b as any).buying_liabilities ?? "0.0000000",
+        sellingLiabilities: (b as any).selling_liabilities ?? "0.0000000",
       };
 
       if (b.asset_type !== "native" && b.asset_type !== "liquidity_pool_shares") {
