@@ -8,36 +8,33 @@ import {
   getStake,
 } from "../lib/stakeF";
 
-// Assuming env variables are already loaded elsewhere
-const STELLAR_PUBLIC_KEY = process.env.STELLAR_PUBLIC_KEY!;
-const STELLAR_NETWORK = (process.env.STELLAR_NETWORK as "testnet" | "mainnet") || "testnet";
-const SOROBAN_RPC_URL = process.env.SOROBAN_RPC_URL || "https://soroban-testnet.stellar.org";
-
-if (!STELLAR_PUBLIC_KEY) {
-  throw new Error("Missing Stellar environment variables");
-}
+const STELLAR_PUBLIC_KEY = process.env.STELLAR_PUBLIC_KEY || "";
+const STELLAR_NETWORK = (process.env.STELLAR_NETWORK?.toLowerCase() || "testnet") as "testnet" | "mainnet";
+const SOROBAN_RPC_URL = process.env.SOROBAN_RPC_URL || 
+  (STELLAR_NETWORK === "mainnet" 
+    ? "https://soroban-mainnet.stellar.org" 
+    : "https://soroban-testnet.stellar.org");
 
 export const StellarContractTool = new DynamicStructuredTool({
   name: "stellar_contract_tool",
-  description:
-    "Interact with a staking contract on Stellar Soroban: initialize, stake, unstake, claim rewards, or get stake.",
+  description: "Interact with a staking contract on Stellar Soroban: initialize, stake, unstake, claim rewards, or get stake.",
   schema: z.object({
     action: z.enum(["initialize", "stake", "unstake", "claim_rewards", "get_stake"]),
-    tokenAddress: z.string().optional(), // Only for initialize
-    rewardRate: z.number().optional(), // Only for initialize
-    amount: z.number().optional(), // For stake/unstake
-    userAddress: z.string().optional(), // For get_stake
-    contractAddress: z.string().optional(), // For overriding default pool on mainnet
+    tokenAddress: z.string().optional(),
+    rewardRate: z.number().optional(),
+    amount: z.number().optional(),
+    userAddress: z.string().optional(),
+    contractAddress: z.string().optional(),
   }),
   func: async (input: any) => {
     const { action, tokenAddress, rewardRate, amount, userAddress, contractAddress } = input;
-    
+
     const config = {
       network: STELLAR_NETWORK,
       rpcUrl: SOROBAN_RPC_URL,
       contractAddress,
     };
-    
+
     try {
       switch (action) {
         case "initialize": {
@@ -47,7 +44,6 @@ export const StellarContractTool = new DynamicStructuredTool({
           const result = await initialize(STELLAR_PUBLIC_KEY, tokenAddress, rewardRate, config);
           return result ?? "Contract initialized successfully.";
         }
-
         case "stake": {
           if (amount === undefined) {
             throw new Error("amount is required for stake");
@@ -55,7 +51,6 @@ export const StellarContractTool = new DynamicStructuredTool({
           const result = await stake(STELLAR_PUBLIC_KEY, amount, config);
           return result ?? `Staked ${amount} successfully.`;
         }
-
         case "unstake": {
           if (amount === undefined) {
             throw new Error("amount is required for unstake");
@@ -63,12 +58,10 @@ export const StellarContractTool = new DynamicStructuredTool({
           const result = await unstake(STELLAR_PUBLIC_KEY, amount, config);
           return result ?? `Unstaked ${amount} successfully.`;
         }
-
         case "claim_rewards": {
           const result = await claimRewards(STELLAR_PUBLIC_KEY, config);
           return result ?? "Rewards claimed successfully.";
         }
-
         case "get_stake": {
           if (!userAddress) {
             throw new Error("userAddress is required for get_stake");
@@ -76,7 +69,6 @@ export const StellarContractTool = new DynamicStructuredTool({
           const stakeAmount = await getStake(STELLAR_PUBLIC_KEY, userAddress, config);
           return `Stake for ${userAddress}: ${stakeAmount}`;
         }
-
         default:
           throw new Error("Unsupported action");
       }
@@ -86,5 +78,3 @@ export const StellarContractTool = new DynamicStructuredTool({
     }
   },
 });
-
-

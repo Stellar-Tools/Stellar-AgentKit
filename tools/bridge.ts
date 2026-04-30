@@ -9,7 +9,6 @@ import {
 } from "@allbridge/bridge-core-sdk";
 import {
   Keypair,
-  Keypair as StellarKeypair,
   rpc,
   Networks
 } from "@stellar/stellar-sdk";
@@ -51,12 +50,11 @@ const STELLAR_NETWORK_CONFIG: Record<StellarNetwork, { networkPassphrase: string
 export const bridgeTokenTool = new DynamicStructuredTool({
   name: "bridge_token",
   description:
-    "Bridge USDC from Stellar to an EVM-compatible chain (Ethereum, Polygon, Arbitrum, or Base). " +
-    "Requires amount, toAddress, and optionally targetChain (defaults to ethereum).",
+    "Bridge token from Stellar chain to EVM compatible chains. Requires amount and toAddress as string",
 
   schema: z.object({
     amount: z.string().describe("The amount of tokens to bridge"),
-    toAddress: z.string().describe("The destination EVM address"),
+    toAddress: z.string().describe("The destination address"),
     fromNetwork: z
       .enum(["stellar-testnet", "stellar-mainnet"])
       .default("stellar-testnet")
@@ -64,7 +62,7 @@ export const bridgeTokenTool = new DynamicStructuredTool({
     targetChain: z
       .enum(["ethereum", "polygon", "arbitrum", "base"])
       .default("ethereum")
-      .describe("Destination EVM chain: ethereum | polygon | arbitrum | base"),
+      .describe("The destination EVM chain"),
   }),
 
   func: async ({
@@ -78,7 +76,7 @@ export const bridgeTokenTool = new DynamicStructuredTool({
     fromNetwork: StellarNetwork;
     targetChain: TargetChain;
   }) => {
-    // Mainnet safeguard - additional layer beyond AgentClient
+    // Mainnet safeguard
     if (
       fromNetwork === "stellar-mainnet" &&
       process.env.ALLOW_MAINNET_BRIDGE !== "true"
@@ -88,8 +86,6 @@ export const bridgeTokenTool = new DynamicStructuredTool({
       );
     }
 
-    const destinationChainSymbol = TARGET_CHAIN_MAP[targetChain];
-
     const sdk = new AllbridgeCoreSdk({
       ...nodeRpcUrlsDefault,
       SRB: `${process.env.SRB_PROVIDER_URL}`,
@@ -97,18 +93,18 @@ export const bridgeTokenTool = new DynamicStructuredTool({
 
     const chainDetailsMap = await sdk.chainDetailsMap();
 
+    // Destination chain symbol dynamic selection
+    const destinationChainSymbol = TARGET_CHAIN_MAP[targetChain];
+
     const sourceToken = ensure(
       chainDetailsMap[ChainSymbol.SRB].tokens.find(
         (t) => t.symbol === "USDC"
       )
     );
-
-    const destinationChainDetails = chainDetailsMap[destinationChainSymbol];
-    if (!destinationChainDetails) {
-      throw new Error(`Chain not supported by Allbridge: ${targetChain}`);
-    }
     const destinationToken = ensure(
-      destinationChainDetails.tokens.find((t) => t.symbol === "USDC")
+      chainDetailsMap[destinationChainSymbol].tokens.find(
+        (t) => t.symbol === "USDC"
+      )
     );
 
     const sendParams = {
@@ -123,7 +119,9 @@ export const bridgeTokenTool = new DynamicStructuredTool({
       gasFeePaymentMethod: FeePaymentMethod.WITH_STABLECOIN,
     };
 
-    const xdrTx = (await sdk.bridge.rawTxBuilder.send(sendParams)) as string;
+    const xdrTx = (await sdk.bridge.rawTxBuilder.send(
+      sendParams
+    )) as string;
 
     const srbKeypair = Keypair.fromSecret(privateKey);
     const transaction = buildTransactionFromXDR(
@@ -156,7 +154,9 @@ export const bridgeTokenTool = new DynamicStructuredTool({
         sentRestoreXdrTx.hash
       );
 
-      if (confirmRestoreXdrTx.status === rpc.Api.GetTransactionStatus.FAILED) {
+      if (
+        confirmRestoreXdrTx.status === rpc.Api.GetTransactionStatus.FAILED
+      ) {
         throw new Error(
           `Restore transaction failed. Hash: ${sentRestoreXdrTx.hash}`
         );
@@ -173,8 +173,10 @@ export const bridgeTokenTool = new DynamicStructuredTool({
         };
       }
 
-      // Rebuild tx with updated sequence numbers after restore
-      const xdrTx2 = (await sdk.bridge.rawTxBuilder.send(sendParams)) as string;
+      const xdrTx2 = (await sdk.bridge.rawTxBuilder.send(
+        sendParams
+      )) as string;
+
       const transaction2 = buildTransactionFromXDR(
         "bridge",
         xdrTx2,
@@ -200,7 +202,6 @@ export const bridgeTokenTool = new DynamicStructuredTool({
       throw new Error(`Transaction failed. Hash: ${sent.hash}`);
     }
 
-    // TrustLine check and setup for source token on Stellar side
     const destinationTokenSBR = sourceToken;
 
     const balanceLine = await sdk.utils.srb.getBalanceLine(
@@ -210,21 +211,23 @@ export const bridgeTokenTool = new DynamicStructuredTool({
 
     const notEnoughBalanceLine =
       !balanceLine ||
-      Big(balanceLine.balance).add(amount).gt(Big(balanceLine.limit));
+      Big(balanceLine.balance)
+        .add(amount)
+        .gt(Big(balanceLine.limit));
 
     if (notEnoughBalanceLine) {
-      const xdrTx = await sdk.utils.srb.buildChangeTrustLineXdrTx({
-        sender: fromAddress,
-        tokenAddress: destinationTokenSBR.tokenAddress,
-      });
+      const xdrTxTrust =
+        await sdk.utils.srb.buildChangeTrustLineXdrTx({
+          sender: fromAddress,
+          tokenAddress: destinationTokenSBR.tokenAddress,
+        });
 
-      const keypair = StellarKeypair.fromSecret(privateKey);
       const trustTx = buildTransactionFromXDR(
         "bridge",
-        xdrTx,
+        xdrTxTrust,
         STELLAR_NETWORK_CONFIG[fromNetwork].networkPassphrase
       );
-      trustTx.sign(keypair);
+      trustTx.sign(srbKeypair);
       const signedTrustLineTx = trustTx.toXDR();
 
       const submit = await sdk.utils.srb.submitTransactionStellar(
