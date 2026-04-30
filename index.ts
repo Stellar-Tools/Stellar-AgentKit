@@ -2,7 +2,7 @@ import { bridgeTokenTool } from "./tools/bridge";
 import { StellarLiquidityContractTool } from "./tools/contract";
 import { StellarDexTool } from "./tools/dex";
 import { StellarContractTool } from "./tools/stake";
-import { stellarSendPaymentTool } from "./tools/stellar";
+import { stellarSendPaymentTool, stellarGetBalanceTool, stellarGetAccountInfoTool } from "./tools/stellar";
 import { 
   AgentClient, 
   AgentConfig,
@@ -36,5 +36,7 @@ export const stellarTools = [
   StellarDexTool,
   StellarLiquidityContractTool,
   StellarContractTool,
-  stellarSendPaymentTool
+  stellarSendPaymentTool,
+  stellarGetBalanceTool,
+  stellarGetAccountInfoTool
 ];

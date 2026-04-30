@@ -17,6 +17,7 @@ import {
 import { bridgeTokenTool } from "./tools/bridge";
 import { AnalyticsManager } from "./lib/analyticsManager";
 import type { PerformanceSummary, DetailedAnalytics, FilterOptions } from "./lib/analytics";
+import { stellarGetBalanceTool, stellarGetAccountInfoTool } from "./tools/stellar";
 import {
   Horizon,
   Keypair,
@@ -209,6 +210,51 @@ export class AgentClient {
       // Mark the transaction as failed
       this.analytics.failTransaction(transactionId, error);
       throw error;
+    }
+  }
+
+  /**
+   * Get the balance of a Stellar account.
+   * @param publicKey Optional Stellar public key (defaults to client's publicKey)
+   */
+  async getBalance(publicKey?: string) {
+    const targetPublicKey = publicKey || this.publicKey;
+    if (!targetPublicKey) {
+      throw new Error("Public key is required to fetch balance.");
+    }
+
+    const result = await stellarGetBalanceTool.func({
+      publicKey: targetPublicKey,
+      network: this.network,
+    });
+
+    try {
+      return JSON.parse(result);
+    } catch (e) {
+      // If it's not JSON (e.g. error message), return as is
+      return result;
+    }
+  }
+
+  /**
+   * Get full details of a Stellar account.
+   * @param publicKey Optional Stellar public key (defaults to client's publicKey)
+   */
+  async getAccountInfo(publicKey?: string) {
+    const targetPublicKey = publicKey || this.publicKey;
+    if (!targetPublicKey) {
+      throw new Error("Public key is required to fetch account info.");
+    }
+
+    const result = await stellarGetAccountInfoTool.func({
+      publicKey: targetPublicKey,
+      network: this.network,
+    });
+
+    try {
+      return JSON.parse(result);
+    } catch (e) {
+      return result;
     }
   }
 

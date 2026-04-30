@@ -1,6 +1,6 @@
 import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
-import * as StellarSdk from "stellar-sdk";
+import * as StellarSdk from "@stellar/stellar-sdk";
 // ... import StellarSdk, getPublicKey, connect, signTransaction, etc. as needed ...
 
 export const stellarSendPaymentTool = new DynamicStructuredTool({
@@ -62,6 +62,84 @@ export const stellarSendPaymentTool = new DynamicStructuredTool({
         (error as Error).message ||
         "Unknown error occurred";
       return `Transaction failed: ${errorMessage}`;
+    }
+  },
+});
+
+export const stellarGetBalanceTool = new DynamicStructuredTool({
+  name: "stellar_get_balance",
+  description: "Get the balance of a Stellar account. Returns balances for XLM and all other assets.",
+  schema: z.object({
+    publicKey: z.string().describe("The Stellar public key to check the balance for"),
+    network: z.enum(["testnet", "mainnet"]).optional().describe("The Stellar network to use (defaults to testnet)"),
+  }),
+  func: async ({ publicKey, network = "testnet" }: { publicKey: string; network?: string }) => {
+    try {
+      if (!StellarSdk.StrKey.isValidEd25519PublicKey(publicKey)) {
+        throw new Error("Invalid Stellar public key.");
+      }
+
+      const horizonUrl = network === "mainnet" 
+        ? "https://horizon.stellar.org" 
+        : "https://horizon-testnet.stellar.org";
+      
+      const server = new StellarSdk.Horizon.Server(horizonUrl);
+      const account = await server.loadAccount(publicKey);
+
+      const balances = account.balances.map((balance: any) => {
+        if (balance.asset_type === "native") {
+          return {
+            asset: "XLM",
+            balance: balance.balance,
+          };
+        } else {
+          return {
+            asset: `${balance.asset_code}:${balance.asset_issuer}`,
+            balance: balance.balance,
+          };
+        }
+      });
+
+      return JSON.stringify(balances, null, 2);
+    } catch (error) {
+      const errorMessage =
+        (error as { response?: { data?: { title?: string } }; message?: string })
+          .response?.data?.title ||
+        (error as Error).message ||
+        "Unknown error occurred";
+      return `Failed to fetch balance: ${errorMessage}`;
+    }
+  },
+});
+
+export const stellarGetAccountInfoTool = new DynamicStructuredTool({
+  name: "stellar_get_account_info",
+  description: "Get full details of a Stellar account, including sequence number, signers, and thresholds.",
+  schema: z.object({
+    publicKey: z.string().describe("The Stellar public key to get info for"),
+    network: z.enum(["testnet", "mainnet"]).optional().describe("The Stellar network to use (defaults to testnet)"),
+  }),
+  func: async ({ publicKey, network = "testnet" }: { publicKey: string; network?: string }) => {
+    try {
+      if (!StellarSdk.StrKey.isValidEd25519PublicKey(publicKey)) {
+        throw new Error("Invalid Stellar public key.");
+      }
+
+      const horizonUrl = network === "mainnet" 
+        ? "https://horizon.stellar.org" 
+        : "https://horizon-testnet.stellar.org";
+      
+      const server = new StellarSdk.Horizon.Server(horizonUrl);
+      const account = await server.loadAccount(publicKey);
+
+      return JSON.stringify(account, (key, value) => (key === "_links" || key === "balances" ? undefined : value), 2);
+    } catch (error) {
+      const errorMessage =
+        (error as { response?: { data?: { title?: string } }; message?: string })
+          .response?.data?.title ||
+        (error as Error).message ||
+        "Unknown error occurred";
+      return `Failed to fetch account info: ${errorMessage}`;
     }
   },
 });
