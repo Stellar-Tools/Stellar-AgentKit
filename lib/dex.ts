@@ -8,6 +8,7 @@ import {
 } from "@stellar/stellar-sdk";
 import { getSigningKeypair, signTransaction } from "./stellar";
 import { buildPathPaymentTransaction } from "../utils/buildTransaction";
+import { decodeStellarError } from "../utils/errorDecoder";
 
 export type StellarAssetInput =
   | { type: "native" }
@@ -260,7 +261,10 @@ export async function swapBestRoute(
     signedXdr,
     getNetworkPassphrase(client.network)
   );
-  const submission = await server.submitTransaction(signedTransaction);
+  const submission = await server.submitTransaction(signedTransaction).catch((err) => {
+    const decodedError = decodeStellarError(err);
+    throw new Error(`Swap failed: ${decodedError}`);
+  });
 
   return {
     hash: submission.hash,

@@ -25,6 +25,7 @@ import {
   Networks,
   BASE_FEE
 } from "@stellar/stellar-sdk";
+import { decodeStellarError } from "./utils/errorDecoder";
 
 const { Server } = Horizon;
 
@@ -444,8 +445,9 @@ export class AgentClient {
       };
 
     } catch (error) {
-      console.error("Token launch failed:", error);
-      throw new Error(`Token launch failed: ${error instanceof Error ? error.message : String(error)}`);
+      const decodedError = decodeStellarError(error);
+      console.error("Token launch failed:", decodedError);
+      throw new Error(`Token launch failed: ${decodedError}`);
     }
   }
 
