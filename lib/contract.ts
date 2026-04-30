@@ -11,6 +11,7 @@ import {
   } from "@stellar/stellar-sdk";
   import { signTransaction } from "./stellar";
   import { buildTransaction } from "../utils/buildTransaction";
+  import { decodeStellarError } from "../utils/errorDecoder";
   
   export interface SorobanContractConfig {
     network: "testnet" | "mainnet";
@@ -111,8 +112,9 @@ import {
       const passphrase = config.network === "mainnet" ? Networks.PUBLIC : Networks.TESTNET;
       const tx = TransactionBuilder.fromXDR(signedXDR, passphrase);
       const txResult = await server.sendTransaction(tx).catch((err) => {
-        console.error(`Send transaction failed for ${functName}: ${err.message}`);
-        throw new Error(`Send transaction failed: ${err.message}`);
+        const decodedError = decodeStellarError(err);
+        console.error(`Send transaction failed for ${functName}: ${decodedError}`);
+        throw new Error(`Send transaction failed: ${decodedError}`);
       });
   
       let txResponse = await server.getTransaction(txResult.hash);
@@ -130,8 +132,9 @@ import {
       }
   
       if (txResponse.status !== "SUCCESS") {
+        const decodedError = decodeStellarError(txResponse);
         console.error(`Transaction failed for ${functName} with status: ${txResponse.status}`, JSON.stringify(txResponse, null, 2));
-        throw new Error(`Transaction failed with status: ${txResponse.status}`);
+        throw new Error(`Transaction failed: ${decodedError} (Status: ${txResponse.status})`);
       }
   
       // Parse return value if present (e.g., for withdraw)
@@ -149,9 +152,9 @@ import {
   
       return null; // No return value for void functions
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(`Error in contract interaction (${functName}):`, errorMessage);
-      throw error;
+      const decodedError = decodeStellarError(error);
+      console.error(`Error in contract interaction (${functName}):`, decodedError);
+      throw new Error(`Contract interaction failed: ${decodedError}`);
     }
   };
   
