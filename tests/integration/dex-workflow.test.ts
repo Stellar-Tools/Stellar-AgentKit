@@ -158,7 +158,7 @@ describe("dex workflow", () => {
         },
         { fetchImpl }
       )
-    ).rejects.toThrow("No route available");
+    ).rejects.toThrow("No route available for");
   });
 
   it("surfaces destination trustline-style submission failures", async () => {
