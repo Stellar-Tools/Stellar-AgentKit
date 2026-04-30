@@ -253,10 +253,12 @@ export class AgentClient {
   };
 
   /**
-   * Stellar Classic DEX routing.
+   * Stellar Classic DEX routing with enhanced slippage protection.
    *
    * These methods use Horizon pathfinding and path payment operations, which can
    * route through the SDEX and built-in liquidity pools.
+   * 
+   * 🛡️ SECURITY: Enhanced with slippage protection and MEV defense
    */
   public dex = {
     quoteSwap: async (params: QuoteSwapParams): Promise<RouteQuote[]> => {
@@ -270,16 +272,35 @@ export class AgentClient {
       );
     },
 
+    /**
+     * Execute best route swap with advanced slippage protection
+     * 
+     * 🛡️ SECURITY FEATURES:
+     * - Automatic slippage optimization based on market conditions
+     * - Price impact analysis and warnings
+     * - MEV (sandwich attack) protection
+     * - Route validation and security scoring
+     * 
+     * @param params Swap parameters with optional protection settings
+     * @returns Swap result with protection information
+     */
     swapBestRoute: async (
       params: SwapBestRouteParams
     ): Promise<SwapBestRouteResult> => {
+      // 🛡️ SECURITY: Enable slippage protection by default
+      const enhancedParams = {
+        ...params,
+        enableSlippageProtection: params.enableSlippageProtection ?? true,
+        maxPriceImpactBps: params.maxPriceImpactBps ?? 300, // 3% default max price impact
+      };
+
       return await executeBestRouteSwap(
         {
           network: this.network,
           horizonUrl: this.rpcUrl,
           publicKey: this.publicKey,
         },
-        params
+        enhancedParams
       );
     },
   };

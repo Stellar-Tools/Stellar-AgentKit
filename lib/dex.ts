@@ -8,6 +8,7 @@ import {
 } from "@stellar/stellar-sdk";
 import { getSigningKeypair, signTransaction } from "./stellar";
 import { buildPathPaymentTransaction } from "../utils/buildTransaction";
+import { SlippageProtectionManager, validateSlippage } from "./slippageProtection";
 
 export type StellarAssetInput =
   | { type: "native" }
@@ -27,6 +28,8 @@ export interface QuoteSwapParams {
 
 export interface SwapBestRouteParams extends QuoteSwapParams {
   slippageBps?: number;
+  enableSlippageProtection?: boolean; // 🛡️ NEW: Enable advanced slippage protection
+  maxPriceImpactBps?: number; // 🛡️ NEW: Maximum acceptable price impact
 }
 
 export interface HorizonPathRecord {
@@ -56,6 +59,10 @@ export interface SwapBestRouteResult {
   sendAmount: string;
   destAmount: string;
   path: StellarAssetInput[];
+  // 🛡️ NEW: Enhanced result information
+  actualSlippageBps?: number;
+  priceImpactBps?: number;
+  protectionWarnings?: string[];
 }
 
 export interface DexClientConfig {
@@ -157,21 +164,34 @@ export function calculateSwapBounds(
   mode: RouteMode,
   slippageBps: number = DEFAULT_SLIPPAGE_BPS
 ): { sendMax?: string; destMin?: string } {
+  // 🛡️ SECURITY: Enhanced slippage validation
+  validateSlippage(slippageBps, 1000); // Max 10% slippage allowed
+  
   if (!Number.isInteger(slippageBps) || slippageBps < 0) {
-    throw new Error("slippageBps must be a non-negative integer");
+    throw new Error("🛡️ slippageBps must be a non-negative integer");
   }
 
   const slippage = new Big(slippageBps).div(10000);
 
   if (mode === "strict-send") {
-    return {
-      destMin: formatStellarAmount(new Big(quote.destAmount).mul(new Big(1).minus(slippage))),
-    };
+    const destMin = formatStellarAmount(new Big(quote.destAmount).mul(new Big(1).minus(slippage)));
+    
+    // 🛡️ SECURITY: Validate minimum output is reasonable
+    if (new Big(destMin).lte(0)) {
+      throw new Error("🛡️ Calculated minimum output is zero or negative - slippage too high");
+    }
+    
+    return { destMin };
   }
 
-  return {
-    sendMax: formatStellarAmount(new Big(quote.sendAmount).mul(new Big(1).plus(slippage))),
-  };
+  const sendMax = formatStellarAmount(new Big(quote.sendAmount).mul(new Big(1).plus(slippage)));
+  
+  // 🛡️ SECURITY: Validate maximum input is reasonable
+  if (new Big(sendMax).gte(new Big(quote.sendAmount).mul(2))) {
+    throw new Error("🛡️ Calculated maximum input is unreasonably high - check slippage settings");
+  }
+
+  return { sendMax };
 }
 
 export async function quoteSwap(
@@ -214,6 +234,10 @@ export async function swapBestRoute(
   validateQuoteParams(params);
   validateQuoteLimit(params.limit);
 
+  // 🛡️ SECURITY: Enhanced slippage validation with protection
+  const requestedSlippageBps = params.slippageBps ?? DEFAULT_SLIPPAGE_BPS;
+  validateSlippage(requestedSlippageBps, 1000); // Max 10% slippage
+
   getSigningKeypair(client.publicKey);
 
   const destination = params.destination ?? client.publicKey;
@@ -223,7 +247,55 @@ export async function swapBestRoute(
   const bestQuote = quotes[0];
 
   if (!bestQuote) {
-    throw new Error("No route available for the requested swap");
+    throw new Error("🛡️ No route available for the requested swap");
+  }
+
+  // 🛡️ SECURITY: Apply slippage protection if enabled
+  let finalSlippageBps = requestedSlippageBps;
+  let protectionWarnings: string[] = [];
+  let priceImpactBps = 0;
+
+  if (params.enableSlippageProtection !== false) { // Default to enabled
+    const slippageProtection = new SlippageProtectionManager({
+      maxSlippageBps: 1000, // 10% absolute maximum
+      priceImpactWarningThreshold: params.maxPriceImpactBps ?? 200, // 2% default warning threshold
+    });
+
+    const tradeAmount = params.mode === "strict-send" ? params.sendAmount! : bestQuote.sendAmount;
+    
+    const protection = slippageProtection.analyzeSlippageProtection(
+      bestQuote,
+      requestedSlippageBps,
+      tradeAmount,
+      params.sendAsset,
+      params.destAsset
+    );
+
+    if (!protection.shouldProceed) {
+      throw new Error(
+        `🛡️ Trade blocked by slippage protection:\n` +
+        `${protection.warnings.join('\n')}\n` +
+        `Consider reducing trade size or adjusting parameters.`
+      );
+    }
+
+    finalSlippageBps = protection.adjustedSlippageBps;
+    protectionWarnings = protection.warnings;
+    priceImpactBps = protection.priceImpact.priceImpactBps;
+
+    // Log protection warnings
+    if (protectionWarnings.length > 0) {
+      console.warn("🛡️ Slippage Protection Warnings:");
+      protectionWarnings.forEach(warning => console.warn(`  ${warning}`));
+    }
+
+    // Additional price impact check
+    if (params.maxPriceImpactBps && priceImpactBps > params.maxPriceImpactBps) {
+      throw new Error(
+        `🛡️ Price impact ${priceImpactBps / 100}% exceeds maximum allowed ${params.maxPriceImpactBps / 100}%.\n` +
+        `${protection.priceImpact.recommendation}`
+      );
+    }
   }
 
   const createServer =
@@ -234,7 +306,7 @@ export async function swapBestRoute(
   const { sendMax, destMin } = calculateSwapBounds(
     bestQuote,
     params.mode,
-    params.slippageBps ?? DEFAULT_SLIPPAGE_BPS
+    finalSlippageBps // Use protected slippage
   );
 
   const transaction = buildPathPaymentTransaction(sourceAccount, {
@@ -268,6 +340,10 @@ export async function swapBestRoute(
     sendAmount: params.mode === "strict-send" ? params.sendAmount! : bestQuote.sendAmount,
     destAmount: params.mode === "strict-receive" ? params.destAmount! : bestQuote.destAmount,
     path: bestQuote.path,
+    // 🛡️ NEW: Include protection information
+    actualSlippageBps: finalSlippageBps,
+    priceImpactBps: priceImpactBps || undefined,
+    protectionWarnings: protectionWarnings.length > 0 ? protectionWarnings : undefined,
   };
 }
 
