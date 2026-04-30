@@ -3,6 +3,16 @@ import { StellarLiquidityContractTool } from "./tools/contract";
 import { StellarDexTool } from "./tools/dex";
 import { StellarContractTool } from "./tools/stake";
 import { stellarSendPaymentTool, stellarGetBalanceTool, stellarGetAccountInfoTool } from "./tools/stellar";
+import { StellarClaimableBalanceTool } from "./tools/claimableBalance";
+export { StellarClaimableBalanceTool } from "./tools/claimableBalance";
+export {
+  MAX_CLAIMANTS_PER_BALANCE,
+  MAX_OPERATIONS_PER_TRANSACTION,
+  MAX_PREDICATE_DEPTH,
+  DEFAULT_TRANSACTION_TIMEOUT_SECONDS,
+  buildPredicate,
+  extractBalanceIdsFromTransactionResult,
+} from "./lib/claimableBalance";
 import { 
   AgentClient, 
   AgentConfig,
@@ -15,6 +25,15 @@ import type {
   RouteQuote,
   SwapBestRouteParams,
   SwapBestRouteResult,
+  CreateClaimableBalanceParams,
+  CreateClaimableBalanceResult,
+  ClaimClaimableBalanceParams,
+  ClaimClaimableBalanceResult,
+  ListClaimableBalancesParams,
+  ClaimableBalanceRecord,
+  ClaimableBalanceOptions,
+  ClaimPredicate,
+  ClaimantInput,
 } from "./agent";
 
 export { 
@@ -30,6 +49,15 @@ export type {
   RouteQuote,
   SwapBestRouteParams,
   SwapBestRouteResult,
+  CreateClaimableBalanceParams,
+  CreateClaimableBalanceResult,
+  ClaimClaimableBalanceParams,
+  ClaimClaimableBalanceResult,
+  ListClaimableBalancesParams,
+  ClaimableBalanceRecord,
+  ClaimableBalanceOptions,
+  ClaimPredicate,
+  ClaimantInput,
 };
 export const stellarTools = [
   bridgeTokenTool,
@@ -38,5 +66,6 @@ export const stellarTools = [
   StellarContractTool,
   stellarSendPaymentTool,
   stellarGetBalanceTool,
-  stellarGetAccountInfoTool
+  stellarGetAccountInfoTool,
+  StellarClaimableBalanceTool,
 ];

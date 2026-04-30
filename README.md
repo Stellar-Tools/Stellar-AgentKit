@@ -21,6 +21,7 @@ multiple operations into a single programmable and extensible toolkit.
 - Liquidity pool (LP) deposits & withdrawals
 - Querying pool reserves and share IDs
 - Custom contract integrations (current)
+- Claimable balances for conditional / time-locked payments (escrow & vesting)
 - Designed for future LP provider integrations
 - Supports Testnet & Mainnet
 
@@ -328,6 +329,115 @@ const reserves = await agent.lp.getReserves();
 // Get share token ID
 const shareId = await agent.lp.getShareId();
 ```
+
+---
+
+## 🔒 Claimable Balances (Conditional / Time-Locked Payments)
+
+Stellar's native primitive for **escrow, vesting, and scheduled payouts** —
+ideal for AI-agent workflows where funds must be released only when a
+predicate is satisfied. Exposed in three ways:
+
+1. Programmatic API on `AgentClient` → `agent.claimable.*`
+2. LangChain `DynamicStructuredTool` → `StellarClaimableBalanceTool` (auto-included in `stellarTools`)
+3. Lower-level functions in `lib/claimableBalance` (`createClaimableBalance`, `claimClaimableBalance`, `listClaimableBalances`, `buildPredicate`)
+
+### Programmatic API
+
+```typescript
+import { AgentClient } from "stellartools";
+
+const agent = new AgentClient({ network: "testnet" });
+
+// 1. Lock 100 XLM for `recipient`, claimable any time within the next 24h
+const created = await agent.claimable.create({
+  sourceSecret: process.env.SOURCE_SECRET!,
+  asset: { code: "XLM" },
+  amount: "100",
+  claimants: [
+    {
+      destination: "GRECIPIENT...",
+      predicate: { type: "beforeRelativeTime", seconds: 86400 },
+    },
+  ],
+});
+console.log(created.transactionHash, created.balanceIds);
+
+// 2. List claimable balances awaiting a specific account
+const open = await agent.claimable.list({ claimant: "GRECIPIENT..." });
+
+// 3. Claim a balance
+await agent.claimable.claim({
+  claimerSecret: process.env.RECIPIENT_SECRET!,
+  balanceId: created.balanceIds[0],
+});
+```
+
+### Composable Predicates
+
+| Type                | Meaning                                            |
+| ------------------- | -------------------------------------------------- |
+| `unconditional`     | Always claimable                                   |
+| `beforeRelativeTime`| Claimable for N seconds after creation             |
+| `beforeAbsoluteTime`| Claimable until a Unix epoch timestamp             |
+| `not`               | Negation of an inner predicate                     |
+| `and` / `or`        | Logical combination of two inner predicates        |
+
+```typescript
+// Two-party escrow: claimable AFTER `releaseAt` AND BEFORE 24h elapse
+const predicate = {
+  type: "and",
+  predicates: [
+    { type: "beforeRelativeTime", seconds: 86400 },
+    {
+      type: "not",
+      predicate: { type: "beforeAbsoluteTime", epochSeconds: releaseAt },
+    },
+  ],
+};
+```
+
+### Defaults & Overrides
+
+The lib exposes the relevant Stellar protocol limits as named exports
+(no magic numbers in user code):
+
+```typescript
+import {
+  MAX_CLAIMANTS_PER_BALANCE,        // 10  (per-balance protocol cap)
+  MAX_OPERATIONS_PER_TRANSACTION,   // 100 (default per-tx ops cap)
+  MAX_PREDICATE_DEPTH,              // 5   (default predicate nesting)
+  DEFAULT_TRANSACTION_TIMEOUT_SECONDS,
+} from "stellartools";
+
+// All of these are overridable per-call via `options`:
+await agent.claimable.create({
+  sourceSecret,
+  asset: { code: "XLM" },
+  amount: "1",
+  claimants,
+  options: {
+    maxOperationsPerTransaction: 50,
+    maxPredicateDepth: 3,
+    transactionTimeoutSeconds: 60,
+    baseFee: "200",
+  },
+});
+```
+
+### LangChain Tool
+
+`StellarClaimableBalanceTool` is auto-bundled into `stellarTools`, so AI
+agents can call `create`, `claim`, and `list` directly via natural language:
+
+> _"Lock 50 XLM for GABCD... claimable any time within the next 2 hours."_
+
+It reads `STELLAR_PRIVATE_KEY` for `create`, and either
+`STELLAR_CLAIMER_PRIVATE_KEY` (preferred) or `STELLAR_PRIVATE_KEY` for
+`claim`. The tool always returns JSON (`{ ok, ... }`) so agents can parse
+the result deterministically.
+
+A runnable example lives at `examples/claimable-balance-example.ts`.
 
 ---
 
